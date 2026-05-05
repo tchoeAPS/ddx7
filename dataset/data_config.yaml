@@ -10,11 +10,11 @@ testset:
 
 # URMP Dataset process options
 urmp:
-  source_folder: '/homes/fsc01/proj/URMP/Dataset' # path to urmp dataset finishing in ... "/URMP/Dataset"
+  source_folder: '/Users/tchoe/school/urmp' # path to urmp dataset finishing in ... "/URMP/Dataset"
   instruments:  #URMP IDs of instruments
     'vn': 'violin'
-    'tpt': 'trumpet'
-    'fl' : flute
+    # 'tpt': 'trumpet'
+    # 'fl' : flute
   mono_regex: 'AuSep'
   num_workers: 4
   input_dir: 'files/train'
@@ -24,7 +24,7 @@ data_processor:
   _target_: create_data.ProcessData
   silence_thresh_dB: 40                 # Silence threshold for splitting instances.
   sr: 16000                             # Sample rate
-  device: 'cuda:0'                      # Torch Device ID
+  device: 'cpu'                      # Torch Device ID
   crepe_params:
     model: 'full'                       # use 'full' for dataset generation - 'tiny' also available
     confidence_threshold: 0.80          # used 0.80 for flute, and 0.85 for violin and trumpet
