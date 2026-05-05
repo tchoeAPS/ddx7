@@ -1,6 +1,6 @@
 __pycache__/
 *.wav
-venv/
+.venv/
 dataset/data/
 dataset/outputs/
 *.egg-info/
