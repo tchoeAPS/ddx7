@@ -4,3 +4,4 @@ __pycache__/
 dataset/data/
 dataset/outputs/
 *.egg-info/
+runs/
