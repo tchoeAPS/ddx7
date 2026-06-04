@@ -1,7 +1,8 @@
 # Additional Dataset process options
 testset:
   source_folder: '/homes/fsc01/proj/wavetest' # Path to a directory containing folders with instrument names
-  instruments: ['violin','flute','trumpet']   # Specify names of the folders in test set
+  # instruments: ['violin','flute','trumpet']   # Specify names of the folders in test set
+  instruments: ['violin']
   contiguous: True                            # Do not 'chop' into instances, generate a single contiguous instance extracted from audio.
   clip_noise: True                            # Clip loudness back to -80db when f0 is over 1900 (avoids crepe to track noise)
   input_dir: 'files/test'
