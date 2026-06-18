@@ -78,38 +78,38 @@ def main(args):
     rms_pos = rms_pos[0, 0]
     rms_neg = -rms_neg[0, 0]
     corners = []
-    peak_start = None
-    peak_end = None
-    trough_start = None
-    trough_end = None
+    max_start = None
+    max_end = None
+    min_start = None
+    min_end = None
     min_peak_height = rms_pos * data_processor.corner_position.peak_height_factor
     for i in range(1, len(audio_chunk)):
         prev = audio_chunk[i - 1]
         curr = audio_chunk[i]
 
         if prev < rms_pos and curr >= rms_pos:
-            peak_start = i - 1
+            max_start = i - 1
 
         if prev > rms_pos and curr <= rms_pos:
-            peak_end = i + 1
-            region = audio_chunk[peak_start:peak_end]
+            max_end = i + 1
+            region = audio_chunk[max_start:max_end]
             peak_local_idx = np.argmax(region)
-            peak_idx = peak_start + peak_local_idx
+            peak_idx = max_start + peak_local_idx
             peak_value = audio_chunk[peak_idx]
             if peak_value < min_peak_height:
                 continue
             corners.append([i / sr, audio_chunk[peak_idx]])
         
         if prev > rms_neg and curr <= rms_neg:
-            trough_start = i - 1
+            min_start = i - 1
         
         if prev < rms_neg and curr >= rms_neg:
-            if trough_start is None:
+            if min_start is None:
                 continue
-            trough_end = i + 1
-            region = audio_chunk[trough_start:trough_end]
+            min_end = i + 1
+            region = audio_chunk[min_start:min_end]
             peak_local_idx = np.argmin(region)
-            peak_idx = trough_start + peak_local_idx
+            peak_idx = min_start + peak_local_idx
             peak_value = audio_chunk[peak_idx]
             if peak_value > -min_peak_height:
                 continue
