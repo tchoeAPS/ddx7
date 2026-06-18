@@ -41,7 +41,10 @@ data_processor:
   seq_len: 3                             # Minimum block len (in seconds) -> block is padded to fit max_len
   debug: False                           # Verbose
   center: False                          # True: Center loudness and pitch window before computing. False: Pad at the end.
-
+  corner_position:
+    enabled: True
+    peak_height_factor: 1.5
+    
 hydra:
   run:
     dir: outputs/null

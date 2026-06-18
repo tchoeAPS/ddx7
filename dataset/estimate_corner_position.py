@@ -3,12 +3,12 @@ import librosa
 import numpy as np
 import functools
 import operator
-import matplotlib.pyplot as plt
+import hydra
 
-def process_indices(indices: list, sr) -> list:
+def process_indices(indices: list, sr, min_len_seconds: int, max_len_seconds: int) -> list:
     # Length in samples.
-    max_len = 4 * sr  # Assuming a sample rate of 16 kHz
-    min_len = 3 * sr
+    max_len = max_len_seconds * sr
+    min_len = min_len_seconds * sr
 
     def expand_long(indices_tuple: tuple) -> list:
         if indices_tuple[1] - indices_tuple[0] > max_len:
@@ -33,23 +33,46 @@ def split_positive_negative_indices(indices: list, sr: int) -> tuple:
             negative_indices.append([i/sr, val])
     return positive_indices, negative_indices
 
-# def regression_lines
+def get_default_wav_path(args) -> Path:
+    cwd = Path(hydra.utils.get_original_cwd())
+    instrument = next(iter(args.urmp.instruments.values()))
+    input_dir = cwd / args.urmp.input_dir / instrument
+    wav_paths = sorted(input_dir.glob("*.wav"))
+    for wav_path in wav_paths:
+        return wav_path
+    raise FileNotFoundError(f"No .wav files found in {input_dir}")
 
-def main():
-    wav_path = Path("files/train/violin/AuSep_1_vn_01_Jupiter.wav")
 
-    audio, sr = librosa.load(wav_path, sr=16000)
-    sound_indices = librosa.effects.split(audio, top_db=40)
-    sound_indices = process_indices(sound_indices, sr)
+def calculate_split_rms(positive_indices: list, negative_indices: list, hop_size: int = 64) -> tuple:
+    y_pos_vals = [x[1] for x in positive_indices]
+    y_neg_vals = [x[1] for x in negative_indices]
+    rms_pos = librosa.feature.rms(y=np.array(y_pos_vals), frame_length=len(positive_indices), hop_length=hop_size, center=False)
+    rms_neg = librosa.feature.rms(y=np.array(y_neg_vals), frame_length=len(negative_indices), hop_length=hop_size, center=False)
+    print(f"RMS+: {rms_pos}, RMS-: {rms_neg}")
+    return rms_pos, rms_neg
+
+@hydra.main(config_path="./", config_name="data_config.yaml", version_base=None)
+def main(args):
+    data_processor = args.data_processor
+    wav_path = get_default_wav_path(args)
+
+    audio, sr = librosa.load(wav_path, sr=data_processor.sr)
+    sound_indices = librosa.effects.split(audio, top_db=data_processor.silence_thresh_dB)
+    sound_indices = process_indices(
+        sound_indices,
+        sr,
+        min_len_seconds=data_processor.seq_len,
+        max_len_seconds=data_processor.max_len,
+    )
     audio_chunk = audio[sound_indices[0][0]:sound_indices[0][1]]
-    split_indices = split_positive_negative_indices(audio_chunk, sr)
+    positive_indices, negative_indices = split_positive_negative_indices(audio_chunk, sr)
 
     # 1. Calculate RMS+ and RMS-
-    y_pos_vals = [x[1] for x in split_indices[0]]
-    y_neg_vals = [x[1] for x in split_indices[1]]
-    rms_pos = librosa.feature.rms(y=np.array(y_pos_vals), frame_length=len(split_indices[0]), hop_length=64, center=False)
-    rms_neg = librosa.feature.rms(y=np.array(y_neg_vals), frame_length=len(split_indices[1]), hop_length=64, center=False)
-    print(f"RMS+: {rms_pos}, RMS-: {rms_neg}")
+    rms_pos, rms_neg = calculate_split_rms(
+        positive_indices,
+        negative_indices,
+        hop_size=data_processor.hop_size,
+    )
 
     # 2. Find where the waveform crosses RMS- and RMS+
     rms_pos = rms_pos[0, 0]
@@ -59,7 +82,7 @@ def main():
     peak_end = None
     trough_start = None
     trough_end = None
-    min_peak_height = rms_pos * 1.5
+    min_peak_height = rms_pos * data_processor.corner_position.peak_height_factor
     for i in range(1, len(audio_chunk)):
         prev = audio_chunk[i - 1]
         curr = audio_chunk[i]
@@ -95,6 +118,8 @@ def main():
     # X/Y values for the measured audio waveform.
     t = np.arange(len(audio_chunk)) / sr
     y = audio_chunk
+
+    import matplotlib.pyplot as plt
 
     plt.figure()
     # Blue line: measured audio/displacement.
