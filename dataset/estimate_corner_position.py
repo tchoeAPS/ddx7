@@ -49,7 +49,56 @@ def calculate_split_rms(positive_indices: list, negative_indices: list, hop_size
     rms_pos = librosa.feature.rms(y=np.array(y_pos_vals), frame_length=len(positive_indices), hop_length=hop_size, center=False)
     rms_neg = librosa.feature.rms(y=np.array(y_neg_vals), frame_length=len(negative_indices), hop_length=hop_size, center=False)
     print(f"RMS+: {rms_pos}, RMS-: {rms_neg}")
-    return rms_pos, rms_neg
+    return rms_pos[0, 0], -rms_neg[0, 0]
+
+def find_corners(audio_chunk, sr, rms_pos, rms_neg, peak_height_factor):
+    corners = []
+    corner_positions = [0] * len(audio_chunk)
+    max_start = None
+    max_end = None
+    min_start = None
+    min_end = None
+    min_peak_height = rms_pos * peak_height_factor
+    for i in range(1, len(audio_chunk)):
+        prev = audio_chunk[i - 1]
+        curr = audio_chunk[i]
+
+        # start of max
+        if prev < rms_pos and curr >= rms_pos:
+            max_start = i - 1
+
+        # end of max
+        if prev > rms_pos and curr <= rms_pos:
+            if max_start is None:
+                continue
+            max_end = i + 1
+            max_region = audio_chunk[max_start:max_end]
+            max_local_idx = np.argmax(max_region)
+            max_idx = max_start + max_local_idx
+            max_value = audio_chunk[max_idx]
+            if max_value < min_peak_height:
+                continue
+            corners.append([i / sr, audio_chunk[max_idx]])
+            corner_positions[i] = 1
+        
+        # start of min
+        if prev > rms_neg and curr <= rms_neg:
+            min_start = i - 1
+        
+        # end of min
+        if prev < rms_neg and curr >= rms_neg:
+            if min_start is None:
+                continue
+            min_end = i + 1
+            min_region = audio_chunk[min_start:min_end]
+            min_local_idx = np.argmin(min_region)
+            min_idx = min_start + min_local_idx
+            min_value = audio_chunk[min_idx]
+            if min_value > -min_peak_height:
+                continue
+            corners.append([i / sr, audio_chunk[min_idx]])
+            corner_positions[i] = 1
+    return corners
 
 @hydra.main(config_path="./", config_name="data_config.yaml", version_base=None)
 def main(args):
@@ -75,45 +124,13 @@ def main(args):
     )
 
     # 2. Find where the waveform crosses RMS- and RMS+
-    rms_pos = rms_pos[0, 0]
-    rms_neg = -rms_neg[0, 0]
-    corners = []
-    max_start = None
-    max_end = None
-    min_start = None
-    min_end = None
-    min_peak_height = rms_pos * data_processor.corner_position.peak_height_factor
-    for i in range(1, len(audio_chunk)):
-        prev = audio_chunk[i - 1]
-        curr = audio_chunk[i]
-
-        if prev < rms_pos and curr >= rms_pos:
-            max_start = i - 1
-
-        if prev > rms_pos and curr <= rms_pos:
-            max_end = i + 1
-            region = audio_chunk[max_start:max_end]
-            peak_local_idx = np.argmax(region)
-            peak_idx = max_start + peak_local_idx
-            peak_value = audio_chunk[peak_idx]
-            if peak_value < min_peak_height:
-                continue
-            corners.append([i / sr, audio_chunk[peak_idx]])
-        
-        if prev > rms_neg and curr <= rms_neg:
-            min_start = i - 1
-        
-        if prev < rms_neg and curr >= rms_neg:
-            if min_start is None:
-                continue
-            min_end = i + 1
-            region = audio_chunk[min_start:min_end]
-            peak_local_idx = np.argmin(region)
-            peak_idx = min_start + peak_local_idx
-            peak_value = audio_chunk[peak_idx]
-            if peak_value > -min_peak_height:
-                continue
-            corners.append([i / sr, audio_chunk[peak_idx]])
+    corners = find_corners(
+        audio_chunk,
+        sr,
+        rms_pos,
+        rms_neg,
+        peak_height_factor=data_processor.corner_position.peak_height_factor,
+    )
 
     # X/Y values for the measured audio waveform.
     t = np.arange(len(audio_chunk)) / sr
