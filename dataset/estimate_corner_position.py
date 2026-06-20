@@ -53,7 +53,7 @@ def calculate_split_rms(positive_indices: list, negative_indices: list, hop_size
 
 def find_corners(audio_chunk, sr, rms_pos, rms_neg, peak_height_factor):
     corners = []
-    corner_positions = [0] * len(audio_chunk)
+    corner_positions = np.zeros(len(audio_chunk), dtype=np.float32)
     max_start = None
     max_end = None
     min_start = None
@@ -79,7 +79,7 @@ def find_corners(audio_chunk, sr, rms_pos, rms_neg, peak_height_factor):
             if max_value < min_peak_height:
                 continue
             corners.append([i / sr, audio_chunk[max_idx]])
-            corner_positions[i] = 1
+            corner_positions[i] = 1.0
         
         # start of min
         if prev > rms_neg and curr <= rms_neg:
@@ -97,7 +97,9 @@ def find_corners(audio_chunk, sr, rms_pos, rms_neg, peak_height_factor):
             if min_value > -min_peak_height:
                 continue
             corners.append([i / sr, audio_chunk[min_idx]])
-            corner_positions[i] = 1
+            corner_positions[i] = -1.0
+    np.set_printoptions(threshold=np.inf)
+    print(corner_positions)
     return corners
 
 @hydra.main(config_path="./", config_name="data_config.yaml", version_base=None)
