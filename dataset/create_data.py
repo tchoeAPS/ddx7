@@ -25,6 +25,7 @@ class ProcessData():
     def __init__(self, silence_thresh_dB, sr, device, seq_len,
                 crepe_params, loudness_params,
                 rms_params, hop_size, max_len, center,
+                corner_position = None,
                 overlap = 0.0,
                 debug = False,
                 contiguous = False,
@@ -42,6 +43,7 @@ class ProcessData():
         self.feat_size = self.max_len*self.sr //self.hop_size
         self.audio_size = self.max_len*self.sr
         self.center = center
+        self.corner_position = corner_position
         self.overlap = overlap
         self.debug = debug
         self.contiguous = contiguous
@@ -128,11 +130,87 @@ class ProcessData():
                 pad_value=-_DB_RANGE)
         return rms
 
-    def save_data(self, audio, f0, loudness, rms, h5f, counter):
+    def split_positive_negative_indices(self, audio):
+        positive_indices = []
+        negative_indices = []
+        for i, val in enumerate(audio):
+            if val > 0:
+                positive_indices.append([i/self.sr, val])
+            elif val < 0:
+                negative_indices.append([i/self.sr, val])
+        return positive_indices, negative_indices
+
+    def calculate_split_rms(self, positive_indices, negative_indices):
+        if len(positive_indices) == 0 or len(negative_indices) == 0:
+            return None, None
+
+        y_pos_vals = [x[1] for x in positive_indices]
+        y_neg_vals = [x[1] for x in negative_indices]
+        rms_pos = librosa.feature.rms(y=np.array(y_pos_vals), frame_length=len(positive_indices), hop_length=self.hop_size, center=False)
+        rms_neg = librosa.feature.rms(y=np.array(y_neg_vals), frame_length=len(negative_indices), hop_length=self.hop_size, center=False)
+        return rms_pos[0, 0], -rms_neg[0, 0]
+
+    def calc_corner_positions(self, audio):
+        corner_positions = np.zeros(
+            int(np.ceil(len(audio) / self.hop_size)),
+            dtype=np.float32,
+        )
+        positive_indices, negative_indices = self.split_positive_negative_indices(audio)
+        rms_pos, rms_neg = self.calculate_split_rms(positive_indices, negative_indices)
+        if rms_pos is None or rms_neg is None:
+            return self.pad_to_expected_size(corner_positions,
+                    expected_size = self.feat_size,
+                    pad_value=0)
+
+        max_start = None
+        min_start = None
+        min_peak_height = rms_pos * self.corner_position.peak_height_factor
+        for i in range(1, len(audio)):
+            prev = audio[i - 1]
+            curr = audio[i]
+
+            if prev < rms_pos and curr >= rms_pos:
+                max_start = i - 1
+
+            if prev > rms_pos and curr <= rms_pos:
+                if max_start is None:
+                    continue
+                max_end = i + 1
+                max_region = audio[max_start:max_end]
+                max_local_idx = np.argmax(max_region)
+                max_idx = max_start + max_local_idx
+                max_value = audio[max_idx]
+                if max_value < min_peak_height:
+                    continue
+                corner_positions[max_idx // self.hop_size] = 1.0
+
+            if prev > rms_neg and curr <= rms_neg:
+                min_start = i - 1
+
+            if prev < rms_neg and curr >= rms_neg:
+                if min_start is None:
+                    continue
+                min_end = i + 1
+                min_region = audio[min_start:min_end]
+                min_local_idx = np.argmin(min_region)
+                min_idx = min_start + min_local_idx
+                min_value = audio[min_idx]
+                if min_value > -min_peak_height:
+                    continue
+                corner_positions[min_idx // self.hop_size] = -1.0
+
+        corner_positions = self.pad_to_expected_size(corner_positions,
+                expected_size = self.feat_size,
+                pad_value=0)
+        return corner_positions
+
+    def save_data(self, audio, f0, loudness, rms, h5f, counter, corner_positions=None):
         h5f.create_dataset(f'{counter}_audio', data=audio)
         h5f.create_dataset(f'{counter}_f0', data=f0)
         h5f.create_dataset(f'{counter}_loudness', data=loudness)
         h5f.create_dataset(f'{counter}_rms', data=rms)
+        if corner_positions is not None:
+            h5f.create_dataset(f'{counter}_corner_position', data=corner_positions)
         return counter + 1
 
     def init_h5(self, data_dir):
@@ -184,6 +262,9 @@ class ProcessData():
                 # Further downsamples the audio back to the other specified sample rates and returns a dictionary.
                 loudness = self.calc_loudness(audio)
                 rms = self.calc_rms(audio)
+                corner_positions = None
+                if(self.corner_position is not None and self.corner_position.enabled is True):
+                    corner_positions = self.calc_corner_positions(audio)
                 if(self.contiguous):
                     if(self.contiguous_clip_noise):
                         if(self.debug): print("[DEBUG] clipping noise")
@@ -194,7 +275,7 @@ class ProcessData():
                 else:
                     audio = self.pad_to_expected_size(audio,self.audio_size,0)
                 if(self.debug): print(f'\t Store block {counter}: f0 : {f0.shape} - loudness : {loudness.shape} - rms {rms.shape} - audio : {audio.shape}')
-                counter = self.save_data(audio, f0, loudness, rms, h5f, counter)
+                counter = self.save_data(audio, f0, loudness, rms, h5f, counter, corner_positions=corner_positions)
 
         # Finished storing f0 and loudness
         self.close_h5(h5f)
@@ -329,7 +410,7 @@ def make_urmp(args):
                                 CWD / args.urmp.output_dir)
     return
 
-@hydra.main(config_path="./",config_name="data_config.yaml")
+@hydra.main(config_path="./",config_name="data_config.yaml", version_base=None)
 def main(args):
 
     if(args.process_testset is True): make_testset(args)
