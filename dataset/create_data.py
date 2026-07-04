@@ -186,10 +186,6 @@ class ProcessData:
                     self.debug,
                     corner_positions=corner_positions,
                 )
-                print(
-                    f"[DEBUG] saved data block {counter - 1}: loudness={loudness}, rms={rms}, corner_positions={corner_positions}"
-                )
-                raise RuntimeError("Temporary stop after first saved data block")
 
         # Finished storing f0 and loudness
         close_h5(h5f)
