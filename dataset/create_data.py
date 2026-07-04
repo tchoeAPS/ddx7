@@ -66,19 +66,48 @@ class ProcessData:
 
     def process_audio_chunk(self, audio):
         try:
-            f0 = extract_f0(self, audio)
+            f0 = extract_f0(
+                audio,
+                self.sr,
+                self.hop_size,
+                self.crepe_params,
+                self.device,
+                self.center,
+                self.feat_size,
+                self.contiguous,
+                self.debug,
+            )
         except ValueError:
             return None
 
-        loudness = calc_loudness(self, audio)
-        rms = calc_rms(self, audio)
+        loudness = calc_loudness(
+            audio,
+            self.sr,
+            self.loudness_params,
+            self.hop_size,
+            self.center,
+            self.feat_size,
+            self.contiguous,
+            self.debug,
+        )
+        rms = calc_rms(
+            audio, self.rms, self.hop_size, self.feat_size, self.contiguous, self.debug
+        )
 
         corner_positions = None
         if self.debug:
             print(f"[DEBUG] corner_position enabled: {self.corner_position_enabled()}")
 
         if self.corner_position_enabled():
-            corner_positions = calc_corner_positions(self, audio)
+            corner_positions = calc_corner_positions(
+                audio,
+                self.hop_size,
+                self.feat_size,
+                self.corner_position,
+                self.sr,
+                self.contiguous,
+                self.debug,
+            )
 
         if self.contiguous:
             if self.contiguous_clip_noise:
@@ -88,17 +117,11 @@ class ProcessData:
                 loudness[clip_pos] = -_DB_RANGE
 
             audio = pad_to_expected_size(
-                self,
-                audio,
-                f0.shape[0] * self.hop_size,
-                0,
+                audio, f0.shape[0] * self.hop_size, 0, self.contiguous, self.debug
             )
         else:
             audio = pad_to_expected_size(
-                self,
-                audio,
-                self.audio_size,
-                0,
+                audio, self.audio_size, 0, self.contiguous, self.debug
             )
 
         return audio, f0, loudness, rms, corner_positions
@@ -113,7 +136,7 @@ class ProcessData:
         output_dir.mkdir(exist_ok=True)
 
         # Open container
-        h5f = init_h5(self, output_dir)
+        h5f = init_h5(self.sr, output_dir)
         counter = 0
 
         for audio_file in tqdm(audio_files):
@@ -126,7 +149,9 @@ class ProcessData:
                 data,
                 silence_thresh_dB=self.silence_thresh_dB,
                 contiguous=self.contiguous,
-                processor=self,
+                max_len=self.max_len,
+                sr=self.sr,
+                seq_len=self.seq_len,
             )
             if len(sounds_indices) == 0:
                 continue
@@ -152,13 +177,13 @@ class ProcessData:
                         f"\t Store block {counter}: f0 : {f0.shape} - loudness : {loudness.shape} - rms {rms.shape} - audio : {audio.shape}"
                     )
                 counter = save_data(
-                    self,
                     audio,
                     f0,
                     loudness,
                     rms,
                     h5f,
                     counter,
+                    self.debug,
                     corner_positions=corner_positions,
                 )
                 print(

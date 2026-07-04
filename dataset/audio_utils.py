@@ -4,9 +4,9 @@ import numpy as np
 import librosa
 
 
-def _process_indices(self, indices: list) -> list:
+def _process_indices(max_len, sr, seq_len, indices: list) -> list:
     # Length in samples.
-    max_len = self.max_len * self.sr
+    max_len = max_len * sr
 
     def expand_long(indices_tuple: tuple) -> list:
         if indices_tuple[1] - indices_tuple[0] > max_len:
@@ -23,14 +23,14 @@ def _process_indices(self, indices: list) -> list:
 
     new_indices = [*map(expand_long, indices)]
     new_indices = functools.reduce(operator.concat, new_indices, [])
-    new_indices = [x for x in new_indices if (x[1] - x[0] > self.seq_len * self.sr)]
+    new_indices = [x for x in new_indices if (x[1] - x[0] > seq_len * sr)]
     return new_indices
 
 
-def pad_to_expected_size(self, features, expected_size, pad_value):
+def pad_to_expected_size(features, expected_size, pad_value, contiguous, debug):
 
     # Pad to next integer division if we are processing a whole file in one go.
-    if self.contiguous == True:
+    if contiguous == True:
         # Pad up to next integer division
         pad_len = (
             features.shape[-1] // expected_size + 1
@@ -39,7 +39,7 @@ def pad_to_expected_size(self, features, expected_size, pad_value):
         features = np.pad(features, (0, pad_len), "constant", constant_values=pad_value)
         return features
     else:
-        if self.debug:
+        if debug:
             print(
                 "Feat shape {} - expected size: {}".format(
                     features.shape[-1], expected_size
@@ -61,10 +61,10 @@ def load_normalized_audio(audio_file, sr):
     return data
 
 
-def get_sound_indices(audio, silence_thresh_dB, contiguous, processor):
+def get_sound_indices(audio, silence_thresh_dB, contiguous, max_len, sr, seq_len):
     if contiguous:
         return [[0, len(audio)]]
 
     # print("[DEBUG] Sound indices {}".format(sounds_indices))
     sound_indices = librosa.effects.split(audio, top_db=silence_thresh_dB)
-    return _process_indices(processor, sound_indices)
+    return _process_indices(max_len, sr, seq_len, sound_indices)
