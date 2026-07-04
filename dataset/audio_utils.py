@@ -1,9 +1,10 @@
 import operator
 import functools
 import numpy as np
+import librosa
 
 
-def process_indices(self, indices: list) -> list:
+def _process_indices(self, indices: list) -> list:
     # Length in samples.
     max_len = self.max_len * self.sr
 
@@ -52,3 +53,18 @@ def pad_to_expected_size(self, features, expected_size, pad_value):
         if features.shape[-1] > expected_size:
             raise Exception("Expected size is smaller than current value")
     return features
+
+
+def load_normalized_audio(audio_file, sr):
+    data, _ = librosa.load(audio_file.as_posix(), sr=sr)
+    data = librosa.util.normalize(data)  # Peak-normalize audio
+    return data
+
+
+def get_sound_indices(audio, silence_thresh_dB, contiguous, processor):
+    if contiguous:
+        return [[0, len(audio)]]
+
+    # print("[DEBUG] Sound indices {}".format(sounds_indices))
+    sound_indices = librosa.effects.split(audio, top_db=silence_thresh_dB)
+    return _process_indices(processor, sound_indices)
