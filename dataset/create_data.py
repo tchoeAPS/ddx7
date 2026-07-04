@@ -61,6 +61,48 @@ class ProcessData:
     def set_confidence(self, confidence):
         self.crepe_params.confidence_threshold = confidence
 
+    def corner_position_enabled(self):
+        return self.corner_position is not None and self.corner_position.enabled is True
+
+    def process_audio_chunk(self, audio):
+        try:
+            f0 = extract_f0(self, audio)
+        except ValueError:
+            return None
+
+        loudness = calc_loudness(self, audio)
+        rms = calc_rms(self, audio)
+
+        corner_positions = None
+        if self.debug:
+            print(f"[DEBUG] corner_position enabled: {self.corner_position_enabled()}")
+
+        if self.corner_position_enabled():
+            corner_positions = calc_corner_positions(self, audio)
+
+        if self.contiguous:
+            if self.contiguous_clip_noise:
+                if self.debug:
+                    print("[DEBUG] clipping noise")
+                clip_pos = f0 > 1900.0
+                loudness[clip_pos] = -_DB_RANGE
+
+            audio = pad_to_expected_size(
+                self,
+                audio,
+                f0.shape[0] * self.hop_size,
+                0,
+            )
+        else:
+            audio = pad_to_expected_size(
+                self,
+                audio,
+                self.audio_size,
+                0,
+            )
+
+        return audio, f0, loudness, rms, corner_positions
+
     """
     Main audio processing function
     """
@@ -99,36 +141,12 @@ class ProcessData:
                     )
 
                 # Feature retrieval segment
-
-                try:  # Only process audio with enough CREPE confidence
-                    f0 = extract_f0(self, audio)
-                except ValueError:
+                processed_chunk = self.process_audio_chunk(audio)
+                if processed_chunk is None:
                     continue
 
-                # Further downsamples the audio back to the other specified sample rates and returns a dictionary.
-                loudness = calc_loudness(self, audio)
-                rms = calc_rms(self, audio)
-                corner_positions = None
-                corner_position_enabled = (
-                    self.corner_position is not None
-                    and self.corner_position.enabled is True
-                )
-                if self.debug:
-                    print(f"[DEBUG] corner_position enabled: {corner_position_enabled}")
-                if corner_position_enabled:
-                    corner_positions = calc_corner_positions(self, audio)
-                if self.contiguous:
-                    if self.contiguous_clip_noise:
-                        if self.debug:
-                            print("[DEBUG] clipping noise")
-                        clip_pos = f0 > 1900.0
-                        loudness[clip_pos] = -_DB_RANGE
-                    audio = pad_to_expected_size(
-                        self, audio, f0.shape[0] * self.hop_size, 0
-                    )
+                audio, f0, loudness, rms, corner_positions = processed_chunk
 
-                else:
-                    audio = pad_to_expected_size(self, audio, self.audio_size, 0)
                 if self.debug:
                     print(
                         f"\t Store block {counter}: f0 : {f0.shape} - loudness : {loudness.shape} - rms {rms.shape} - audio : {audio.shape}"
@@ -144,7 +162,7 @@ class ProcessData:
                     corner_positions=corner_positions,
                 )
                 print(
-                    f"[DEBUG] saved data block {counter - 1}: audio={audio}, f0={f0}, loudness={loudness}, rms={rms}, corner_positions={corner_positions}"
+                    f"[DEBUG] saved data block {counter - 1}: loudness={loudness}, rms={rms}, corner_positions={corner_positions}"
                 )
                 raise RuntimeError("Temporary stop after first saved data block")
 
