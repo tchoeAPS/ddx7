@@ -11,7 +11,7 @@ def get_loaders(instrument,data_dir,train_split = 0.80,batch_size=16,device='cpu
    # Loading Data and splitting it into train validation and test data
     print(hydra.utils.get_original_cwd())
     traindata_path = '{}{}'.format(hydra.utils.get_original_cwd(), f'/{data_dir}/train/{instrument}/16000.h5')
-    input_keys = ('audio','loudness','f0','rms')
+    input_keys = ('audio','loudness','f0','rms', 'corner_position')
     traindset = h5Dataset(sr=16000,
                     data_path=traindata_path,
                     input_keys=input_keys,
@@ -66,7 +66,24 @@ def get_loaders(instrument,data_dir,train_split = 0.80,batch_size=16,device='cpu
 
     return loaders
 
-@hydra.main(config_path="recipes",config_name="config.yaml")
+def verify_preprocessed_batch_shapes(loaders, preprocessor):
+    x = next(iter(loaders['train']))
+    x = preprocessor.run(x)
+    conditioning_keys = ('f0_scaled', 'loudness_scaled', 'corner_position_scaled')
+
+    print('[INFO] Preprocessed conditioning batch shapes:')
+    conditioning_shapes = {}
+    for key in conditioning_keys:
+        if key not in x:
+            raise KeyError(f"Missing preprocessed conditioning key: {key}")
+        conditioning_shapes[key] = tuple(x[key].shape)
+        print(f'\t{key}: {conditioning_shapes[key]}')
+
+    unique_shapes = set(conditioning_shapes.values())
+    if len(unique_shapes) != 1:
+        raise ValueError(f"Conditioning shape mismatch: {conditioning_shapes}")
+
+@hydra.main(config_path="recipes",config_name="config.yaml",version_base=None)
 def main(args):
     torch.manual_seed(args.seed)
 
@@ -82,8 +99,10 @@ def main(args):
         hyperparams.scheduler = torch.optim.lr_scheduler.ExponentialLR
 
     model = hydra.utils.instantiate(args.model)
+    preprocessor = F0LoudnessRMSPreprocessor()
+    verify_preprocessed_batch_shapes(loaders, preprocessor)
     trainer = Trainer(loaders=loaders,
-                    preprocessor=F0LoudnessRMSPreprocessor(),
+                    preprocessor=preprocessor,
                     hyperparams=hyperparams,
                     device = args.device)
 

@@ -151,19 +151,38 @@ class ProcessData():
         return rms_pos[0, 0], -rms_neg[0, 0]
 
     def calc_corner_positions(self, audio):
+        if(self.debug):
+            print(f"[DEBUG] calc_corner_positions audio shape: {audio.shape}")
+            print(f"[DEBUG] audio min/max: {audio.min()} / {audio.max()}")
+
         corner_positions = np.zeros(
             int(np.ceil(len(audio) / self.hop_size)),
             dtype=np.float32,
         )
         positive_indices, negative_indices = self.split_positive_negative_indices(audio)
+        if(self.debug):
+            print(f"[DEBUG] positive samples: {len(positive_indices)}")
+            print(f"[DEBUG] negative samples: {len(negative_indices)}")
+
         rms_pos, rms_neg = self.calculate_split_rms(positive_indices, negative_indices)
+        if(self.debug):
+            print(f"[DEBUG] rms_pos: {rms_pos}, rms_neg: {rms_neg}")
+
         if rms_pos is None or rms_neg is None:
-            return self.pad_to_expected_size(corner_positions,
+            corner_positions = self.pad_to_expected_size(corner_positions,
                     expected_size = self.feat_size,
                     pad_value=0)
+            if(self.debug):
+                print("[DEBUG] max corners: 0")
+                print("[DEBUG] min corners: 0")
+                print(f"[DEBUG] corner_positions shape: {corner_positions.shape}")
+                print(f"[DEBUG] corner_positions unique values: {np.unique(corner_positions)}")
+            return corner_positions
 
         max_start = None
         min_start = None
+        max_count = 0
+        min_count = 0
         min_peak_height = rms_pos * self.corner_position.peak_height_factor
         for i in range(1, len(audio)):
             prev = audio[i - 1]
@@ -183,6 +202,7 @@ class ProcessData():
                 if max_value < min_peak_height:
                     continue
                 corner_positions[max_idx // self.hop_size] = 1.0
+                max_count += 1
 
             if prev > rms_neg and curr <= rms_neg:
                 min_start = i - 1
@@ -198,10 +218,16 @@ class ProcessData():
                 if min_value > -min_peak_height:
                     continue
                 corner_positions[min_idx // self.hop_size] = -1.0
+                min_count += 1
 
         corner_positions = self.pad_to_expected_size(corner_positions,
                 expected_size = self.feat_size,
                 pad_value=0)
+        if(self.debug):
+            print(f"[DEBUG] max corners: {max_count}")
+            print(f"[DEBUG] min corners: {min_count}")
+            print(f"[DEBUG] corner_positions shape: {corner_positions.shape}")
+            print(f"[DEBUG] corner_positions unique values: {np.unique(corner_positions)}")
         return corner_positions
 
     def save_data(self, audio, f0, loudness, rms, h5f, counter, corner_positions=None):
@@ -211,6 +237,8 @@ class ProcessData():
         h5f.create_dataset(f'{counter}_rms', data=rms)
         if corner_positions is not None:
             h5f.create_dataset(f'{counter}_corner_position', data=corner_positions)
+            if(self.debug):
+                print(f"[DEBUG] saved {counter}_corner_position shape: {corner_positions.shape}")
         return counter + 1
 
     def init_h5(self, data_dir):
@@ -263,7 +291,10 @@ class ProcessData():
                 loudness = self.calc_loudness(audio)
                 rms = self.calc_rms(audio)
                 corner_positions = None
-                if(self.corner_position is not None and self.corner_position.enabled is True):
+                corner_position_enabled = self.corner_position is not None and self.corner_position.enabled is True
+                if(self.debug):
+                    print(f"[DEBUG] corner_position enabled: {corner_position_enabled}")
+                if(corner_position_enabled):
                     corner_positions = self.calc_corner_positions(audio)
                 if(self.contiguous):
                     if(self.contiguous_clip_noise):

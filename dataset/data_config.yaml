@@ -39,7 +39,7 @@ data_processor:
   hop_size: 64                           # hop size in samples for CREPE, RMS, or loudness
   max_len: 4                             # Maximum block len ( in seconds )
   seq_len: 3                             # Minimum block len (in seconds) -> block is padded to fit max_len
-  debug: False                           # Verbose
+  debug: False                            # Verbose
   center: False                          # True: Center loudness and pitch window before computing. False: Pad at the end.
   corner_position:
     enabled: True

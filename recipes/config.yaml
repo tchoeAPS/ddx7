@@ -1,6 +1,6 @@
 defaults:
   - hyperparams: ddx7
-  - model: tcnres_f0ld_fmstr    # Model to train (TCN w/ residual connections and string FM synth)
+  - model: tcnres_f0ldcp_fmstr    # Model to train (TCN w/ residual connections and string FM synth)
 
 instrument: violin
 device: cpu
