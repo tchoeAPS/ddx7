@@ -54,7 +54,7 @@ def get_loaders(instrument,data_dir,train_split = 0.80,batch_size=16,device='cpu
                         data_path=testcdata_path,
                         input_keys=input_keys,
                         max_audio_val=1,
-                        device='cpu') #Force test set on CPU
+                        device='mps') #Force test set on CPU
 
         testcloader = DataLoader(test_cnt,
                                 batch_size=1, # Always batch size of 1 for continuous test
