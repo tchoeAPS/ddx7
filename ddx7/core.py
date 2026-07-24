@@ -5,13 +5,15 @@ import numpy as np
 import librosa as li
 import math
 
-_DB_RANGE = 80.0 #Min loudness
+_DB_RANGE = 80.0  # Min loudness
 _REF_DB = 20.7  # White noise, amplitude=1.0, n_fft=2048
 _F0_RANGE = 127
 
-def safe_log(x,eps=1e-7):
+
+def safe_log(x, eps=1e-7):
     eps = torch.tensor(eps)
     return torch.log(x + eps)
+
 
 def safe_divide(numerator, denominator, eps=1e-7):
     """Avoid dividing by zero by adding a small epsilon."""
@@ -19,21 +21,26 @@ def safe_divide(numerator, denominator, eps=1e-7):
     safe_denominator = torch.where(denominator == 0.0, eps, denominator)
     return numerator / safe_denominator
 
+
 def logb(x, base=2.0, eps=1e-5):
     """Logarithm with base as an argument."""
     return safe_divide(safe_log(x, eps), safe_log(base, eps), eps)
 
+
 def hz_to_midi(frequencies):
     """Torch-compatible hz_to_midi function."""
     notes = 12.0 * (logb(frequencies, 2.0) - logb(440.0, 2.0)) + 69.0
-    notes = torch.where(torch.le(frequencies, torch.zeros(1).to(frequencies)),
-                        torch.zeros(1).to(frequencies), notes)
+    notes = torch.where(
+        torch.le(frequencies, torch.zeros(1).to(frequencies)),
+        torch.zeros(1).to(frequencies),
+        notes,
+    )
     return notes
 
 
 @torch.no_grad()
-def cumsum_nd(in_tensor,wrap_value=None):
-    '''
+def cumsum_nd(in_tensor, wrap_value=None):
+    """
     cumsum_nd() : cummulative sum - non differentiable and with wrap value.
 
     The problem with cumsum: when we work with phase tensors that are too large
@@ -55,20 +62,21 @@ def cumsum_nd(in_tensor,wrap_value=None):
 
     TODO: implement an efficient vectorial cumsum with wrapping we can use to accumulate
           phases from all oscillators separately
-    '''
-    print("[WARNING] Using non differentiable cumsum. Non-integer frequency ratios wont render well.")
+    """
+    print(
+        "[WARNING] Using non differentiable cumsum. Non-integer frequency ratios wont render well."
+    )
     input_len = in_tensor.size()[1]
     nb = in_tensor.size()[0]
-    acc = torch.zeros([nb,1,1])
-    out_tensor = torch.zeros([nb,input_len,1])
-    #print("in size{} - out size{}".format(in_tensor.size(),out_tensor.size()))
+    acc = torch.zeros([nb, 1, 1])
+    out_tensor = torch.zeros([nb, input_len, 1])
+    # print("in size{} - out size{}".format(in_tensor.size(),out_tensor.size()))
     for i in range(input_len):
-        acc += in_tensor[:,i,0]
-        if(wrap_value is not None):
-            acc = acc - (acc > wrap_value)*wrap_value
-        out_tensor[:,i,0] = acc
+        acc += in_tensor[:, i, 0]
+        if wrap_value is not None:
+            acc = acc - (acc > wrap_value) * wrap_value
+        out_tensor[:, i, 0] = acc
     return out_tensor
-
 
 
 @torch.no_grad()
@@ -120,9 +128,11 @@ def resample(x, factor: int):
     return y
 
 
-def upsample(signal, factor,mode='nearest'):
+def upsample(signal, factor, mode="nearest"):
     signal = signal.permute(0, 2, 1)
-    signal = nn.functional.interpolate(signal, size=signal.shape[-1] * factor,mode=mode)
+    signal = nn.functional.interpolate(
+        signal, size=signal.shape[-1] * factor, mode=mode
+    )
     return signal.permute(0, 2, 1)
 
 
@@ -143,7 +153,6 @@ def extract_loudness(signal, sampling_rate, block_size, n_fft=2048):
     S = np.mean(S, 0)[..., :-1]
 
     return S
-
 
 
 def get_mlp(in_size, hidden_size, n_layers):
@@ -183,15 +192,15 @@ def fft_convolve(signal, kernel):
     kernel = nn.functional.pad(kernel, (kernel.shape[-1], 0))
 
     output = fft.irfft(fft.rfft(signal) * fft.rfft(kernel))
-    output = output[..., output.shape[-1] // 2:]
+    output = output[..., output.shape[-1] // 2 :]
 
     return output
 
 
-def harmonic_synth(pitch, amplitudes, sampling_rate,use_safe_cumsum=False):
+def harmonic_synth(pitch, amplitudes, sampling_rate, use_safe_cumsum=False):
 
-    if(use_safe_cumsum==True):
-        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2*np.pi)
+    if use_safe_cumsum == True:
+        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2 * np.pi)
     else:
         omega = torch.cumsum(2 * np.pi * pitch / sampling_rate, 1)
 
@@ -200,207 +209,275 @@ def harmonic_synth(pitch, amplitudes, sampling_rate,use_safe_cumsum=False):
     signal = (torch.sin(omegas) * amplitudes).sum(-1, keepdim=True)
     return signal
 
-OP6=5
-OP5=4
-OP4=3
-OP3=2
-OP2=1
-OP1=0
 
-def fm_2stack2(pitch, ol, fr, sampling_rate,max_ol,use_safe_cumsum=False):
+OP6 = 5
+OP5 = 4
+OP4 = 3
+OP3 = 2
+OP2 = 1
+OP1 = 0
 
-    if(use_safe_cumsum==True):
-        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2*np.pi)
+
+def fm_2stack2(pitch, ol, fr, sampling_rate, max_ol, use_safe_cumsum=False):
+
+    if use_safe_cumsum == True:
+        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2 * np.pi)
     else:
         omega = torch.cumsum(2 * np.pi * pitch / sampling_rate, 1)
 
     # Torch unsqueeze with dim -1 adds a new dimension at the end of ol to match phases.
 
-    op4_phase =  fr[OP4] * omega
-    op4_output = torch.unsqueeze(ol[:,:,OP4], dim=-1) * torch.sin(op4_phase)
+    op4_phase = fr[OP4] * omega
+    op4_output = torch.unsqueeze(ol[:, :, OP4], dim=-1) * torch.sin(op4_phase)
 
-    op3_phase =  fr[OP3] * omega + 2 * np.pi * op4_output
-    op3_output = torch.unsqueeze(ol[:,:,OP3], dim=-1) * torch.sin(op3_phase) # output of stack of 2
+    op3_phase = fr[OP3] * omega + 2 * np.pi * op4_output
+    op3_output = torch.unsqueeze(ol[:, :, OP3], dim=-1) * torch.sin(
+        op3_phase
+    )  # output of stack of 2
 
-    op2_phase =  fr[OP2] * omega
-    op2_output = torch.unsqueeze(ol[:,:,OP2], dim=-1) * torch.sin(op2_phase)
+    op2_phase = fr[OP2] * omega
+    op2_output = torch.unsqueeze(ol[:, :, OP2], dim=-1) * torch.sin(op2_phase)
 
-    op1_phase =  fr[OP1] * omega + 2 * np.pi * op2_output
-    op1_output = torch.unsqueeze(ol[:,:,OP1], dim=-1) * torch.sin(op1_phase) # output of stack of 2
+    op1_phase = fr[OP1] * omega + 2 * np.pi * op2_output
+    op1_output = torch.unsqueeze(ol[:, :, OP1], dim=-1) * torch.sin(
+        op1_phase
+    )  # output of stack of 2
 
-    return (op3_output + op1_output)/max_ol
+    return (op3_output + op1_output) / max_ol
 
-def fm_1stack2(pitch, ol, fr, sampling_rate,max_ol,use_safe_cumsum=False):
 
-    if(use_safe_cumsum==True):
-        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2*np.pi)
+def fm_1stack2(pitch, ol, fr, sampling_rate, max_ol, use_safe_cumsum=False):
+
+    if use_safe_cumsum == True:
+        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2 * np.pi)
     else:
         omega = torch.cumsum(2 * np.pi * pitch / sampling_rate, 1)
 
     # Torch unsqueeze with dim -1 adds a new dimension at the end of ol to match phases.
 
-    op2_phase =  fr[OP2] * omega
-    op2_output = torch.unsqueeze(ol[:,:,OP2], dim=-1) * torch.sin(op2_phase)
+    op2_phase = fr[OP2] * omega
+    op2_output = torch.unsqueeze(ol[:, :, OP2], dim=-1) * torch.sin(op2_phase)
 
-    op1_phase =  fr[OP1] * omega + 2 * np.pi * op2_output
-    op1_output = torch.unsqueeze(ol[:,:,OP1], dim=-1) * torch.sin(op1_phase) # output of stack of 2
+    op1_phase = fr[OP1] * omega + 2 * np.pi * op2_output
+    op1_output = torch.unsqueeze(ol[:, :, OP1], dim=-1) * torch.sin(
+        op1_phase
+    )  # output of stack of 2
 
-    return op1_output/max_ol
+    return op1_output / max_ol
 
 
-def fm_1stack4(pitch, ol, fr, sampling_rate,max_ol,use_safe_cumsum=False):
+def fm_1stack4(pitch, ol, fr, sampling_rate, max_ol, use_safe_cumsum=False):
 
-    if(use_safe_cumsum==True):
-        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2*np.pi)
+    if use_safe_cumsum == True:
+        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2 * np.pi)
     else:
         omega = torch.cumsum(2 * np.pi * pitch / sampling_rate, 1)
 
     # Torch unsqueeze with dim -1 adds a new dimension at the end of ol to match phases.
 
-    op4_phase =  fr[OP4] * omega
-    op4_output = torch.unsqueeze(ol[:,:,OP4], dim=-1) * torch.sin(op4_phase)
+    op4_phase = fr[OP4] * omega
+    op4_output = torch.unsqueeze(ol[:, :, OP4], dim=-1) * torch.sin(op4_phase)
 
-    op3_phase =  fr[OP3] * omega + 2 * np.pi * op4_output
-    op3_output = torch.unsqueeze(ol[:,:,OP3], dim=-1) * torch.sin(op3_phase) # output of stack of 4
+    op3_phase = fr[OP3] * omega + 2 * np.pi * op4_output
+    op3_output = torch.unsqueeze(ol[:, :, OP3], dim=-1) * torch.sin(
+        op3_phase
+    )  # output of stack of 4
 
-    op2_phase =  fr[OP2] * omega + 2 * np.pi * op3_output
-    op2_output = torch.unsqueeze(ol[:,:,OP2], dim=-1) * torch.sin(op2_phase)
+    op2_phase = fr[OP2] * omega + 2 * np.pi * op3_output
+    op2_output = torch.unsqueeze(ol[:, :, OP2], dim=-1) * torch.sin(op2_phase)
 
-    op1_phase =  fr[OP1] * omega + 2 * np.pi * op2_output
-    op1_output = torch.unsqueeze(ol[:,:,OP1], dim=-1) * torch.sin(op1_phase) # output of stack of 2
+    op1_phase = fr[OP1] * omega + 2 * np.pi * op2_output
+    op1_output = torch.unsqueeze(ol[:, :, OP1], dim=-1) * torch.sin(
+        op1_phase
+    )  # output of stack of 2
 
-    return op1_output/max_ol
+    return op1_output / max_ol
 
 
-'''
+"""
 Ablated Brass FM Synth - with phase wrapping (it does not change behaviour)
      OP4->OP3->|
           OP2->|->OP1->out
 
-'''
-def fm_ablbrass_synth(pitch, ol, fr, sampling_rate,max_ol,use_safe_cumsum=False):
+"""
 
-    if(use_safe_cumsum==True):
-        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2*np.pi)
+
+def fm_ablbrass_synth(pitch, ol, fr, sampling_rate, max_ol, use_safe_cumsum=False):
+
+    if use_safe_cumsum == True:
+        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2 * np.pi)
     else:
         omega = torch.cumsum(2 * np.pi * pitch / sampling_rate, 1)
 
     # Torch unsqueeze with dim -1 adds a new dimension at the end of ol to match phases.
 
-    op4_phase =  fr[OP4] * omega
-    op4_output = torch.unsqueeze(ol[:,:,OP4], dim=-1) * torch.sin(op4_phase % (2*np.pi))
+    op4_phase = fr[OP4] * omega
+    op4_output = torch.unsqueeze(ol[:, :, OP4], dim=-1) * torch.sin(
+        op4_phase % (2 * np.pi)
+    )
 
-    op3_phase =  fr[OP3] * omega + 2 * np.pi * op4_output
-    op3_output = torch.unsqueeze(ol[:,:,OP3], dim=-1) * torch.sin(op3_phase % (2*np.pi)) # output of stack of 2
+    op3_phase = fr[OP3] * omega + 2 * np.pi * op4_output
+    op3_output = torch.unsqueeze(ol[:, :, OP3], dim=-1) * torch.sin(
+        op3_phase % (2 * np.pi)
+    )  # output of stack of 2
 
-    op2_phase =  fr[OP2] * omega
-    op2_output = torch.unsqueeze(ol[:,:,OP2], dim=-1) * torch.sin(op2_phase % (2*np.pi)) # output stack of 1
+    op2_phase = fr[OP2] * omega
+    op2_output = torch.unsqueeze(ol[:, :, OP2], dim=-1) * torch.sin(
+        op2_phase % (2 * np.pi)
+    )  # output stack of 1
 
-    op1_phase =  fr[OP1] * omega + 2 * np.pi * (op2_output + op3_output)
-    op1_output = torch.unsqueeze(ol[:,:,OP1], dim=-1) * torch.sin(op1_phase % (2*np.pi)) # global carrier
+    op1_phase = fr[OP1] * omega + 2 * np.pi * (op2_output + op3_output)
+    op1_output = torch.unsqueeze(ol[:, :, OP1], dim=-1) * torch.sin(
+        op1_phase % (2 * np.pi)
+    )  # global carrier
 
-    return op1_output/max_ol
+    return op1_output / max_ol
 
-'''
+
+"""
 String FM Synth - with phase wrapping (it does not change behaviour)
 PATCH NAME: STRINGS 1
 OP6->OP5->OP4->OP3 |
        (R)OP2->OP1 |->out
-'''
-def fm_string_synth(pitch, ol, fr, sampling_rate,max_ol,use_safe_cumsum=False):
+"""
 
-    if(use_safe_cumsum==True):
-        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2*np.pi)
+
+def fm_string_synth(pitch, ol, fr, sampling_rate, max_ol, use_safe_cumsum=False):
+
+    if use_safe_cumsum == True:
+        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2 * np.pi)
     else:
         omega = torch.cumsum(2 * np.pi * pitch / sampling_rate, 1)
 
     # Torch unsqueeze with dim -1 adds a new dimension at the end of ol to match phases.
-    op6_phase =  fr[OP6] * omega
-    op6_output = torch.unsqueeze(ol[:,:,OP6], dim=-1) * torch.sin(op6_phase % (2*np.pi))
+    op6_phase = fr[OP6] * omega
+    op6_output = torch.unsqueeze(ol[:, :, OP6], dim=-1) * torch.sin(
+        op6_phase % (2 * np.pi)
+    )
 
-    op5_phase =  fr[OP5] * omega + 2 * np.pi * op6_output
-    op5_output = torch.unsqueeze(ol[:,:,OP5], dim=-1)*torch.sin(op5_phase % (2*np.pi))
+    op5_phase = fr[OP5] * omega + 2 * np.pi * op6_output
+    op5_output = torch.unsqueeze(ol[:, :, OP5], dim=-1) * torch.sin(
+        op5_phase % (2 * np.pi)
+    )
 
-    op4_phase =  fr[OP4] * omega + 2 * np.pi * op5_output
-    op4_output = torch.unsqueeze(ol[:,:,OP4], dim=-1) * torch.sin(op4_phase % (2*np.pi))
+    op4_phase = fr[OP4] * omega + 2 * np.pi * op5_output
+    op4_output = torch.unsqueeze(ol[:, :, OP4], dim=-1) * torch.sin(
+        op4_phase % (2 * np.pi)
+    )
 
-    op3_phase =  fr[OP3] * omega + 2 * np.pi * op4_output
-    op3_output = torch.unsqueeze(ol[:,:,OP3], dim=-1) * torch.sin(op3_phase % (2*np.pi)) # output of stack of 4
+    op3_phase = fr[OP3] * omega + 2 * np.pi * op4_output
+    op3_output = torch.unsqueeze(ol[:, :, OP3], dim=-1) * torch.sin(
+        op3_phase % (2 * np.pi)
+    )  # output of stack of 4
 
-    op2_phase =  fr[OP2] * omega
-    op2_output = torch.unsqueeze(ol[:,:,OP2], dim=-1) * torch.sin(op2_phase % (2*np.pi))
+    op2_phase = fr[OP2] * omega
+    op2_output = torch.unsqueeze(ol[:, :, OP2], dim=-1) * torch.sin(
+        op2_phase % (2 * np.pi)
+    )
 
-    op1_phase =  fr[OP1] * omega + 2 * np.pi * op2_output
-    op1_output = torch.unsqueeze(ol[:,:,OP1], dim=-1) * torch.sin(op1_phase % (2*np.pi)) # output of stack of 2
+    op1_phase = fr[OP1] * omega + 2 * np.pi * op2_output
+    op1_output = torch.unsqueeze(ol[:, :, OP1], dim=-1) * torch.sin(
+        op1_phase % (2 * np.pi)
+    )  # output of stack of 2
 
-    return (op3_output + op1_output)/max_ol
+    return (op3_output + op1_output) / max_ol
 
-'''
+
+"""
 Flute FM Synth - with phase wrapping (it does not change behaviour)
 PATCH NAME: FLUTE 1
 (R)OP6->OP5->|
    OP4->OP3->|
         OP2->|->OP1->out
-'''
-def fm_flute_synth(pitch, ol, fr, sampling_rate,max_ol,use_safe_cumsum=False):
+"""
 
-    if(use_safe_cumsum==True):
-        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2*np.pi)
+
+def fm_flute_synth(pitch, ol, fr, sampling_rate, max_ol, use_safe_cumsum=False):
+
+    if use_safe_cumsum == True:
+        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2 * np.pi)
     else:
         omega = torch.cumsum(2 * np.pi * pitch / sampling_rate, 1)
 
     # Torch unsqueeze with dim -1 adds a new dimension at the end of ol to match phases.
-    op6_phase =  fr[OP6] * omega
-    op6_output = torch.unsqueeze(ol[:,:,OP6], dim=-1) * torch.sin(op6_phase % (2*np.pi))
+    op6_phase = fr[OP6] * omega
+    op6_output = torch.unsqueeze(ol[:, :, OP6], dim=-1) * torch.sin(
+        op6_phase % (2 * np.pi)
+    )
 
-    op5_phase =  fr[OP5] * omega + 2 * np.pi * op6_output
-    op5_output = torch.unsqueeze(ol[:,:,OP5], dim=-1)*torch.sin(op5_phase % (2*np.pi)) # output of stack of 2
+    op5_phase = fr[OP5] * omega + 2 * np.pi * op6_output
+    op5_output = torch.unsqueeze(ol[:, :, OP5], dim=-1) * torch.sin(
+        op5_phase % (2 * np.pi)
+    )  # output of stack of 2
 
-    op4_phase =  fr[OP4] * omega
-    op4_output = torch.unsqueeze(ol[:,:,OP4], dim=-1) * torch.sin(op4_phase % (2*np.pi))
+    op4_phase = fr[OP4] * omega
+    op4_output = torch.unsqueeze(ol[:, :, OP4], dim=-1) * torch.sin(
+        op4_phase % (2 * np.pi)
+    )
 
-    op3_phase =  fr[OP3] * omega + 2 * np.pi * op4_output
-    op3_output = torch.unsqueeze(ol[:,:,OP3], dim=-1) * torch.sin(op3_phase % (2*np.pi)) # output of stack of 2
+    op3_phase = fr[OP3] * omega + 2 * np.pi * op4_output
+    op3_output = torch.unsqueeze(ol[:, :, OP3], dim=-1) * torch.sin(
+        op3_phase % (2 * np.pi)
+    )  # output of stack of 2
 
-    op2_phase =  fr[OP2] * omega
-    op2_output = torch.unsqueeze(ol[:,:,OP2], dim=-1) * torch.sin(op2_phase % (2*np.pi)) # output stack of 1
+    op2_phase = fr[OP2] * omega
+    op2_output = torch.unsqueeze(ol[:, :, OP2], dim=-1) * torch.sin(
+        op2_phase % (2 * np.pi)
+    )  # output stack of 1
 
-    op1_phase =  fr[OP1] * omega + 2 * np.pi * (op2_output + op3_output + op5_output)
-    op1_output = torch.unsqueeze(ol[:,:,OP1], dim=-1) * torch.sin(op1_phase % (2*np.pi)) # carrier
+    op1_phase = fr[OP1] * omega + 2 * np.pi * (op2_output + op3_output + op5_output)
+    op1_output = torch.unsqueeze(ol[:, :, OP1], dim=-1) * torch.sin(
+        op1_phase % (2 * np.pi)
+    )  # carrier
 
-    return op1_output/max_ol
+    return op1_output / max_ol
 
-'''
+
+"""
 Brass FM Synth - with phase wrapping (it does not change behaviour)
 PATCH NAME: BRASS 3
 OP6->OP5->OP4->|
        (R)OP3->|
           OP2->|->OP1->out
-'''
-def fm_brass_synth(pitch, ol, fr, sampling_rate,max_ol,use_safe_cumsum=False):
+"""
 
-    if(use_safe_cumsum==True):
-        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2*np.pi)
+
+def fm_brass_synth(pitch, ol, fr, sampling_rate, max_ol, use_safe_cumsum=False):
+
+    if use_safe_cumsum == True:
+        omega = cumsum_nd(2 * np.pi * pitch / sampling_rate, 2 * np.pi)
     else:
         omega = torch.cumsum(2 * np.pi * pitch / sampling_rate, 1)
 
     # Torch unsqueeze with dim -1 adds a new dimension at the end of ol to match phases.
-    op6_phase =  fr[OP6] * omega
-    op6_output = torch.unsqueeze(ol[:,:,OP6], dim=-1) * torch.sin(op6_phase % (2*np.pi))
+    op6_phase = fr[OP6] * omega
+    op6_output = torch.unsqueeze(ol[:, :, OP6], dim=-1) * torch.sin(
+        op6_phase % (2 * np.pi)
+    )
 
-    op5_phase =  fr[OP5] * omega + 2 * np.pi * op6_output
-    op5_output = torch.unsqueeze(ol[:,:,OP5], dim=-1)*torch.sin(op5_phase % (2*np.pi))
+    op5_phase = fr[OP5] * omega + 2 * np.pi * op6_output
+    op5_output = torch.unsqueeze(ol[:, :, OP5], dim=-1) * torch.sin(
+        op5_phase % (2 * np.pi)
+    )
 
-    op4_phase =  fr[OP4] * omega + 2 * np.pi * op5_output
-    op4_output = torch.unsqueeze(ol[:,:,OP4], dim=-1) * torch.sin(op4_phase % (2*np.pi)) # output of stack of 3
+    op4_phase = fr[OP4] * omega + 2 * np.pi * op5_output
+    op4_output = torch.unsqueeze(ol[:, :, OP4], dim=-1) * torch.sin(
+        op4_phase % (2 * np.pi)
+    )  # output of stack of 3
 
-    op3_phase =  fr[OP3] * omega
-    op3_output = torch.unsqueeze(ol[:,:,OP3], dim=-1) * torch.sin(op3_phase % (2*np.pi)) # output of stack of 1
+    op3_phase = fr[OP3] * omega
+    op3_output = torch.unsqueeze(ol[:, :, OP3], dim=-1) * torch.sin(
+        op3_phase % (2 * np.pi)
+    )  # output of stack of 1
 
-    op2_phase =  fr[OP2] * omega
-    op2_output = torch.unsqueeze(ol[:,:,OP2], dim=-1) * torch.sin(op2_phase % (2*np.pi)) # output stack of 1
+    op2_phase = fr[OP2] * omega
+    op2_output = torch.unsqueeze(ol[:, :, OP2], dim=-1) * torch.sin(
+        op2_phase % (2 * np.pi)
+    )  # output stack of 1
 
-    op1_phase =  fr[OP1] * omega + 2 * np.pi * (op2_output + op3_output + op4_output)
-    op1_output = torch.unsqueeze(ol[:,:,OP1], dim=-1) * torch.sin(op1_phase % (2*np.pi)) # carrier
+    op1_phase = fr[OP1] * omega + 2 * np.pi * (op2_output + op3_output + op4_output)
+    op1_output = torch.unsqueeze(ol[:, :, OP1], dim=-1) * torch.sin(
+        op1_phase % (2 * np.pi)
+    )  # carrier
 
-    return op1_output/max_ol
+    return op1_output / max_ol
