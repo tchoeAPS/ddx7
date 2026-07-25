@@ -2,21 +2,48 @@ import torch
 import torch.nn as nn
 from ddx7.tcn import TCN_block
 
+
+class DDSP_BowDecoder(nn.Module):
+    """
+    3-stage wrapper: bow-feature decoder -> physics module -> FM synth.
+    Mirrors DDSP_Decoder's interface/utility methods but with 3 stages.
+    """
+
+    def __init__(self, decoder, physics, synth):
+        super().__init__()
+        self.net = nn.Sequential(decoder, physics, synth)
+
+    def forward(self, x):
+        return self.net(x)
+
+    def get_sr(self):
+        return self.net[2].sample_rate
+
+    def enable_cumsum_nd(self):
+        self.net[2].use_cumsum_nd = True
+
+    def get_params(self, param):
+        if param == "reverb_decay":
+            return self.net[2].reverb.decay.item()
+        if param == "reverb_wet":
+            return self.net[2].reverb.wet.item()
+
+
 """
-TCN-Based decoder for DDX7
+TCN-Based decoder for bow-feature conditioning
 """
 
 
 class TCNBowDecoder(nn.Module):
     """
-    FM Decoder with sigmoid output
+    Bow-feature decoder (bow_force, bow_velocity, bow_bridge_distance)
     """
 
     def __init__(
         self,
         n_blocks=2,
         hidden_channels=64,
-        out_channels=6,
+        out_channels=3,
         kernel_size=3,
         dilation_base=2,
         apply_padding=True,
@@ -98,7 +125,12 @@ class TCNBowDecoder(nn.Module):
         ol = self.net(conditioning)
         ol = ol.permute([0, -1, -2])
         if self.output_complete_controls is True:
-            synth_params = {"f0_hz": x["f0"], "ol": ol}  # In Hz
+            synth_params = {
+                "f0_hz": x["f0"],
+                "bow_force": ol[:, :, 0:1],
+                "bow_velocity": ol[:, :, 1:2],
+                "bow_bridge_distance": ol[:, :, 2:3],
+            }
         else:
             synth_params = ol
         return synth_params

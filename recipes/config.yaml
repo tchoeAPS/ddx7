@@ -3,7 +3,7 @@ defaults:
   - model: tcnres_f0ldcp_fmstr    # Model to train (TCN w/ residual connections and string FM synth)
 
 instrument: violin
-device: cpu
+device: mps
 mode: train
 data_dir: dataset/data          # Processed data dir
 load_additional_testset: False  # Load additional testset from external files.
@@ -20,5 +20,7 @@ run_name: testrun               # Run name (within experiment).
 
 hydra:
   output_subdir: .
+  job:
+    chdir: true
   run:
     dir: ${run_dir}/${exp_name}/${run_name}
