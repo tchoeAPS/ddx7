@@ -4,11 +4,6 @@ from ddx7.tcn import TCN_block
 
 
 class DDSP_BowDecoder(nn.Module):
-    """
-    3-stage wrapper: bow-feature decoder -> physics module -> FM synth.
-    Mirrors DDSP_Decoder's interface/utility methods but with 3 stages.
-    """
-
     def __init__(self, decoder, physics, synth):
         super().__init__()
         self.net = nn.Sequential(decoder, physics, synth)
