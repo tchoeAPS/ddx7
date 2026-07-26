@@ -28,7 +28,7 @@ data_processor:
   device: 'cpu'                      # Torch Device ID
   crepe_params:
     model: 'full'                       # use 'full' for dataset generation - 'tiny' also available
-    confidence_threshold: 0.80          # used 0.80 for flute, and 0.85 for violin and trumpet
+    confidence_threshold: 0.85          # used 0.80 for flute, and 0.85 for violin and trumpet
     batch_size: 128
     fmin: 50
     fmax: 2000
@@ -41,9 +41,9 @@ data_processor:
   seq_len: 3                             # Minimum block len (in seconds) -> block is padded to fit max_len
   debug: False                           # Verbose
   center: False                          # True: Center loudness and pitch window before computing. False: Pad at the end.
-  corner_position:
-    enabled: True
-    peak_height_factor: 1.5
+  # corner_position:
+  #   enabled: True
+  #   peak_height_factor: 1.5
     
 hydra:
   run:
