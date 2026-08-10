@@ -95,11 +95,12 @@ class ProcessData:
         )
 
         corner_positions = None
+        corner_duty_cycle = None
         if self.debug:
             print(f"[DEBUG] corner_position enabled: {self.corner_position_enabled()}")
 
         if self.corner_position_enabled():
-            corner_positions = calc_corner_positions(
+            corner_positions, corner_duty_cycle = calc_corner_positions(
                 audio,
                 self.hop_size,
                 self.feat_size,
@@ -124,11 +125,7 @@ class ProcessData:
                 audio, self.audio_size, 0, self.contiguous, self.debug
             )
 
-        return audio, f0, loudness, rms, corner_positions
-
-    """
-    Main audio processing function
-    """
+        return audio, f0, loudness, rms, corner_positions, corner_duty_cycle
 
     def run_on_files(self, data_dir, input_dir, output_dir):
         audio_files = list((input_dir / data_dir).glob("*.wav"))
@@ -170,7 +167,7 @@ class ProcessData:
                 if processed_chunk is None:
                     continue
 
-                audio, f0, loudness, rms, corner_positions = processed_chunk
+                audio, f0, loudness, rms, corner_positions, corner_duty_cycle = processed_chunk
 
                 if self.debug:
                     print(
@@ -185,6 +182,7 @@ class ProcessData:
                     counter,
                     self.debug,
                     corner_positions=corner_positions,
+                    corner_duty_cycle=corner_duty_cycle,
                 )
 
         # Finished storing f0 and loudness

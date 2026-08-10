@@ -1,0 +1,40 @@
+testset:
+  source_folder: /homes/fsc01/proj/wavetest
+  instruments:
+  - violin
+  contiguous: true
+  clip_noise: true
+  input_dir: files/test
+  output_dir: data/test
+urmp:
+  source_folder: /Users/tchoe/school/urmp
+  instruments:
+    vn: violin
+  mono_regex: AuSep
+  num_workers: 4
+  input_dir: files/train
+  output_dir: data/train
+data_processor:
+  _target_: create_data.ProcessData
+  silence_thresh_dB: 40
+  sr: 16000
+  device: cpu
+  crepe_params:
+    model: full
+    confidence_threshold: 0.8
+    batch_size: 128
+    fmin: 50
+    fmax: 2000
+  loudness_params:
+    nfft: 2048
+  rms_params:
+    frame_size: 2048
+  hop_size: 64
+  max_len: 4
+  seq_len: 3
+  debug: false
+  center: false
+process_urmp: true
+process_testset: false
+skip_copy: false
+skip_process: false

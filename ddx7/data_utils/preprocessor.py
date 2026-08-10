@@ -7,11 +7,13 @@ class F0LoudnessRMSPreprocessor:
     def __init__(self):
         return
 
-    def run(self, x):
-        x["loudness_scaled"] = self.scale_db(x["loudness"])
-        x["rms_scaled"] = self.scale_db(x["rms"])
-        x["f0_scaled"] = self.scale_f0_hz(x["f0"])
-        x["corner_position_scaled"] = x["corner_position"]
+    def run(self,x):
+        x['loudness_scaled'] = self.scale_db(x['loudness'])
+        x['rms_scaled'] = self.scale_db(x['rms'])
+        x['f0_scaled'] = self.scale_f0_hz(x['f0'])
+        x['corner_position_scaled'] = x['corner_position']
+        if 'corner_duty_cycle' in x:
+            x['corner_duty_cycle_scaled'] = x['corner_duty_cycle']
         return x
 
     def scale_db(self, db):

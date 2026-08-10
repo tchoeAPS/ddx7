@@ -44,6 +44,10 @@ data_processor:
   corner_position:
     enabled: True
     peak_height_factor: 1.5
+    use_regression: False           # If True, refine corners to sub-sample precision and derive duty cycle (Stage 2/3).
+    regression_window_samples: 16   # Samples fit on each side of a corner when use_regression is True.
+    use_dynamic_rms: False           # If True, compute RMS+/RMS- as a time-varying low-pass-filtered envelope (paper section 2.2/3.1) instead of one static value over the whole chunk.
+    rms_envelope_cutoff_hz: 150.0    # Low-pass cutoff for the RMS envelope, only used when use_dynamic_rms is True.
     
 hydra:
   run:
