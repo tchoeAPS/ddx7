@@ -3,7 +3,7 @@ defaults:
   - model: tcnres_f0ld_fmstr    # Model to train (TCN w/ residual connections and string FM synth)
 
 instrument: violin
-device: cpu
+device: mps
 mode: train
 data_dir: dataset/data          # Processed data dir
 load_additional_testset: False  # Load additional testset from external files.
