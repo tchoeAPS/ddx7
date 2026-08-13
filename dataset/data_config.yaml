@@ -25,7 +25,7 @@ data_processor:
   _target_: create_data.ProcessData
   silence_thresh_dB: 40                 # Silence threshold for splitting instances.
   sr: 16000                             # Sample rate
-  device: 'cpu'                      # Torch Device ID
+  device: 'mps'                      # Torch Device ID
   crepe_params:
     model: 'full'                       # use 'full' for dataset generation - 'tiny' also available
     confidence_threshold: 0.80          # used 0.80 for flute, and 0.85 for violin and trumpet
