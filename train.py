@@ -61,7 +61,7 @@ def get_loaders(
             data_path=testcdata_path,
             input_keys=input_keys,
             max_audio_val=1,
-            device="mps",
+            device="cpu",
         )  # Force test set on CPU
 
         testcloader = DataLoader(
@@ -123,6 +123,7 @@ def main(args):
         preprocessor=preprocessor,
         hyperparams=hyperparams,
         device=args.device,
+        seed=args.seed,
     )
 
     trainer.run(model, mode=args.mode, resume_epoch=args.resume_epoch)

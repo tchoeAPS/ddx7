@@ -98,13 +98,15 @@ class Hyperparams:
 
 
 # Let's instantiate it using Hydra?
-class Trainer:
-    def __init__(self, loaders, preprocessor, hyperparams: Hyperparams, device):
+class Trainer():
+    def __init__(self,loaders,preprocessor,
+                hyperparams:Hyperparams,device,seed=1234):
         self.loaders = loaders
         self.preprocessor = preprocessor
         self.hp = hyperparams
         self.best_val_loss = np.inf
         self.device = device
+        self.seed = seed
         self.model = None
         self.writer = None
         self.opt = None
@@ -298,8 +300,8 @@ class Trainer:
 
         return mean_loss
 
-    def run(self, model, mode="train", resume_epoch=None):
-        torch.manual_seed(1234)
+    def run(self,model,mode='train',resume_epoch=None):
+        torch.manual_seed(self.seed)
         self.model = model.to(self.device)
         n_params = self.count_parameters(self.model)
         print("[INFO] Model has {} trainable parameters.".format(n_params))
