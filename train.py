@@ -85,7 +85,8 @@ def main(args):
     trainer = Trainer(loaders=loaders,
                     preprocessor=F0LoudnessRMSPreprocessor(),
                     hyperparams=hyperparams,
-                    device = args.device)
+                    device = args.device,
+                    seed = args.seed)
 
     trainer.run(model,
                 mode=args.mode,
