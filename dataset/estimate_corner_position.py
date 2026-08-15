@@ -39,10 +39,6 @@ def _calculate_split_rms(positive_indices, negative_indices, hop_size):
 def calc_corner_positions(
     audio, hop_size, feat_size, corner_position, sr, contiguous, debug
 ):
-    if debug:
-        print(f"[DEBUG] calc_corner_positions audio shape: {audio.shape}")
-        print(f"[DEBUG] audio min/max: {audio.min()} / {audio.max()}")
-
     use_regression = getattr(corner_position, 'use_regression', False) is True
     use_dynamic_rms = getattr(corner_position, 'use_dynamic_rms', False) is True
     num_frames = int(np.ceil(len(audio) / hop_size))
@@ -50,9 +46,6 @@ def calc_corner_positions(
     corner_duty_cycle = np.full(num_frames, -1.0, dtype=np.float32) if use_regression else None
 
     positive_indices, negative_indices = _split_positive_negative_indices(sr, audio)
-    if debug:
-        print(f"[DEBUG] positive samples: {len(positive_indices)}")
-        print(f"[DEBUG] negative samples: {len(negative_indices)}")
 
     if len(positive_indices) == 0 or len(negative_indices) == 0:
         corner_positions = pad_to_expected_size(
@@ -70,13 +63,6 @@ def calc_corner_positions(
                 contiguous=contiguous,
                 debug=debug,
             )
-        if debug:
-            print("[DEBUG] max corners: 0")
-            print("[DEBUG] min corners: 0")
-            print(f"[DEBUG] corner_positions shape: {corner_positions.shape}")
-            print(
-                f"[DEBUG] corner_positions unique values: {np.unique(corner_positions)}"
-            )
         return corner_positions, corner_duty_cycle
 
     if use_dynamic_rms:
@@ -90,9 +76,6 @@ def calc_corner_positions(
         )
         rms_pos_arr = np.full(len(audio), rms_pos, dtype=np.float32)
         rms_neg_arr = np.full(len(audio), rms_neg, dtype=np.float32)
-    if debug:
-        print(f"[DEBUG] rms_pos range: {rms_pos_arr.min()} / {rms_pos_arr.max()}")
-        print(f"[DEBUG] rms_neg range: {rms_neg_arr.min()} / {rms_neg_arr.max()}")
 
     # Stage 1 (section 3.1): threshold-crossing peak-pick against the
     # (static or time-varying) RMS+/RMS- envelope - collects (idx, sign)
@@ -176,12 +159,5 @@ def calc_corner_positions(
             contiguous=contiguous,
             debug=debug,
         )
-
-    if debug:
-        max_count = sum(1 for _idx, sign in breakpoints if sign == 1.0)
-        min_count = sum(1 for _idx, sign in breakpoints if sign == -1.0)
-        print(f"[DEBUG] max corners: {max_count}")
-        print(f"[DEBUG] min corners: {min_count}")
-        print(f"[DEBUG] corner_positions shape: {corner_positions.shape}")
-        print(f"[DEBUG] corner_positions unique values: {np.unique(corner_positions)}")
+        
     return corner_positions, corner_duty_cycle
