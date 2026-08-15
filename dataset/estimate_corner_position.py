@@ -36,54 +36,22 @@ def _calculate_split_rms(positive_indices, negative_indices, hop_size):
     return rms_pos[0, 0], -rms_neg[0, 0]
 
 
-def calc_corner_positions(
-    audio, hop_size, feat_size, corner_position, sr, contiguous, debug
-):
-    use_regression = getattr(corner_position, 'use_regression', False) is True
-    use_dynamic_rms = getattr(corner_position, 'use_dynamic_rms', False) is True
-    num_frames = int(np.ceil(len(audio) / hop_size))
-    corner_positions = np.zeros(num_frames, dtype=np.float32)
-    corner_duty_cycle = np.full(num_frames, -1.0, dtype=np.float32) if use_regression else None
-
-    positive_indices, negative_indices = _split_positive_negative_indices(sr, audio)
-
-    if len(positive_indices) == 0 or len(negative_indices) == 0:
-        corner_positions = pad_to_expected_size(
-            corner_positions,
-            expected_size=feat_size,
-            pad_value=0,
-            contiguous=contiguous,
-            debug=debug,
-        )
-        if use_regression:
-            corner_duty_cycle = pad_to_expected_size(
-                corner_duty_cycle,
-                expected_size=feat_size,
-                pad_value=-1.0,
-                contiguous=contiguous,
-                debug=debug,
-            )
-        return corner_positions, corner_duty_cycle
-
-    if use_dynamic_rms:
-        # Continuously time-varying envelope (paper section 2.2/3.1) instead
-        # of one static value over the whole chunk.
+def _get_rms_thresholds(audio, sr, hop_size, corner_position, positive_indices, negative_indices):
+    if getattr(corner_position, 'use_dynamic_rms', False) is True:
         cutoff_hz = corner_position.rms_envelope_cutoff_hz
-        rms_pos_arr, rms_neg_arr = calculate_dynamic_rms(audio, sr, cutoff_hz)
-    else:
-        rms_pos, rms_neg = _calculate_split_rms(
-            positive_indices, negative_indices, hop_size
-        )
-        rms_pos_arr = np.full(len(audio), rms_pos, dtype=np.float32)
-        rms_neg_arr = np.full(len(audio), rms_neg, dtype=np.float32)
+        return calculate_dynamic_rms(audio, sr, cutoff_hz)
 
-    # Stage 1 (section 3.1): threshold-crossing peak-pick against the
-    # (static or time-varying) RMS+/RMS- envelope - collects (idx, sign)
-    # break-points instead of writing directly into corner_positions inline.
+    rms_pos, rms_neg = _calculate_split_rms(positive_indices, negative_indices, hop_size)
+    rms_pos_arr = np.full(len(audio), rms_pos, dtype=np.float32)
+    rms_neg_arr = np.full(len(audio), rms_neg, dtype=np.float32)
+    return rms_pos_arr, rms_neg_arr
+
+
+def _detect_breakpoints(audio, rms_pos_arr, rms_neg_arr, peak_height_factor):
     breakpoints = []
     max_start = None
     min_start = None
-    min_peak_height_arr = rms_pos_arr * corner_position.peak_height_factor
+    min_peak_height_arr = rms_pos_arr * peak_height_factor
     for i in range(1, len(audio)):
         prev = audio[i - 1]
         curr = audio[i]
@@ -119,45 +87,74 @@ def calc_corner_positions(
             breakpoints.append((min_idx, -1.0))
 
     breakpoints.sort(key=lambda b: b[0])
+    return breakpoints
+
+
+def _build_no_regression_output(breakpoints, corner_positions, hop_size):
+    for idx, sign in breakpoints:
+        corner_positions[idx // hop_size] = sign
+    return corner_positions
+
+
+def _build_regression_output(audio, breakpoints, corner_positions, corner_duty_cycle, hop_size, window, num_frames):
+    refined_times = []
+    refined_signs = []
+    for idx, sign in breakpoints:
+        t_refined = refine_breakpoint(audio, idx, window)
+        refined_times.append(t_refined)
+        refined_signs.append(sign)
+        frame_idx = int(np.clip(round(t_refined / hop_size), 0, num_frames - 1))
+        corner_positions[frame_idx] = sign
+
+    cycles = compute_relative_corner_position(refined_times, refined_signs)
+    for t_start, t_end, duty in cycles:
+        frame_start = int(t_start // hop_size)
+        frame_end = min(int(t_end // hop_size), num_frames)
+        corner_duty_cycle[frame_start:frame_end] = duty
+
+    return corner_positions, corner_duty_cycle
+
+
+def calc_corner_positions(
+    audio, hop_size, feat_size, corner_position, sr, contiguous, debug
+):
+    use_regression = getattr(corner_position, 'use_regression', False) is True
+    num_frames = int(np.ceil(len(audio) / hop_size))
+    corner_positions = np.zeros(num_frames, dtype=np.float32)
+    corner_duty_cycle = np.full(num_frames, -1.0, dtype=np.float32) if use_regression else None
+
+    def pad(arr, pad_value):
+        return pad_to_expected_size(
+            arr, expected_size=feat_size, pad_value=pad_value,
+            contiguous=contiguous, debug=debug,
+        )
+
+    positive_indices, negative_indices = _split_positive_negative_indices(sr, audio)
+
+    if len(positive_indices) == 0 or len(negative_indices) == 0:
+        corner_positions = pad(corner_positions, 0)
+        if use_regression:
+            corner_duty_cycle = pad(corner_duty_cycle, -1.0)
+        return corner_positions, corner_duty_cycle
+
+    rms_pos_arr, rms_neg_arr = _get_rms_thresholds(
+        audio, sr, hop_size, corner_position, positive_indices, negative_indices
+    )
+
+    breakpoints = _detect_breakpoints(
+        audio, rms_pos_arr, rms_neg_arr, corner_position.peak_height_factor
+    )
 
     if not use_regression:
-        # Stage 1 output only, matching the original behavior exactly.
-        for idx, sign in breakpoints:
-            corner_positions[idx // hop_size] = sign
+        corner_positions = _build_no_regression_output(breakpoints, corner_positions, hop_size)
     else:
-        # Stage 2/3 (sections 3.2, 3.3.2): refine each break-point to
-        # sub-sample precision, then derive the relative corner position
-        # (duty cycle) per full stick+slip cycle.
-        window = corner_position.regression_window_samples
-        refined_times = []
-        refined_signs = []
-        for idx, sign in breakpoints:
-            t_refined, _amplitude = refine_breakpoint(audio, idx, window)
-            refined_times.append(t_refined)
-            refined_signs.append(sign)
-            frame_idx = int(np.clip(round(t_refined / hop_size), 0, num_frames - 1))
-            corner_positions[frame_idx] = sign
-
-        cycles = compute_relative_corner_position(refined_times, refined_signs)
-        for t_start, t_end, duty in cycles:
-            frame_start = int(t_start // hop_size)
-            frame_end = min(int(t_end // hop_size), num_frames)
-            corner_duty_cycle[frame_start:frame_end] = duty
-
-    corner_positions = pad_to_expected_size(
-        corner_positions,
-        expected_size=feat_size,
-        pad_value=0,
-        contiguous=contiguous,
-        debug=debug,
-    )
-    if use_regression:
-        corner_duty_cycle = pad_to_expected_size(
-            corner_duty_cycle,
-            expected_size=feat_size,
-            pad_value=-1.0,
-            contiguous=contiguous,
-            debug=debug,
+        corner_positions, corner_duty_cycle = _build_regression_output(
+            audio, breakpoints, corner_positions, corner_duty_cycle,
+            hop_size, corner_position.regression_window_samples, num_frames,
         )
-        
+
+    corner_positions = pad(corner_positions, 0)
+    if use_regression:
+        corner_duty_cycle = pad(corner_duty_cycle, -1.0)
+
     return corner_positions, corner_duty_cycle
