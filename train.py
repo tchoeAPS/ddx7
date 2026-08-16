@@ -20,7 +20,7 @@ def get_loaders(
     traindata_path = "{}{}".format(
         hydra.utils.get_original_cwd(), f"/{data_dir}/train/{instrument}/16000.h5"
     )
-    input_keys = ("audio", "loudness", "f0", "rms", "corner_position")
+    input_keys = ("audio", "loudness", "f0", "rms", "corner_position", "corner_duty_cycle")
     traindset = h5Dataset(
         sr=16000,
         data_path=traindata_path,
@@ -80,7 +80,7 @@ def get_loaders(
 def verify_preprocessed_batch_shapes(loaders, preprocessor):
     x = next(iter(loaders["train"]))
     x = preprocessor.run(x)
-    conditioning_keys = ("f0_scaled", "loudness_scaled", "corner_position_scaled")
+    conditioning_keys = ("f0_scaled", "loudness_scaled", "corner_position_scaled", "corner_duty_cycle_scaled")
 
     print("[INFO] Preprocessed conditioning batch shapes:")
     conditioning_shapes = {}

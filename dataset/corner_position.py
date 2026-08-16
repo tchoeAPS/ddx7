@@ -13,7 +13,7 @@ def refine_breakpoint(audio, idx, window):
     right_end = idx + 1 + window
 
     if left_start < 0 or right_end > len(audio):
-        return float(idx), float(audio[idx])
+        return float(idx)
 
     x_left = np.arange(left_start, left_end)
     y_left = audio[left_start:left_end]
@@ -24,11 +24,11 @@ def refine_breakpoint(audio, idx, window):
     slope_r, intercept_r = fit_line(x_right, y_right)
 
     if abs(slope_l - slope_r) < 1e-9:
-        return float(idx), float(audio[idx])
+        return float(idx)
 
     t_refined = (intercept_r - intercept_l) / (slope_l - slope_r)
     if t_refined < left_start or t_refined > right_end:
-        return float(idx), float(audio[idx])
+        return float(idx)
 
     return float(t_refined)
 

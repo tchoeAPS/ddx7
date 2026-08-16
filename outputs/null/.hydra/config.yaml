@@ -18,10 +18,10 @@ data_processor:
   _target_: create_data.ProcessData
   silence_thresh_dB: 40
   sr: 16000
-  device: cpu
+  device: mps
   crepe_params:
     model: full
-    confidence_threshold: 0.8
+    confidence_threshold: 0.85
     batch_size: 128
     fmin: 50
     fmax: 2000
@@ -34,6 +34,11 @@ data_processor:
   seq_len: 3
   debug: false
   center: false
+  corner_position:
+    enabled: false
+    peak_height_factor: 1.5
+    regression_window_samples: 16
+    rms_envelope_cutoff_hz: 150.0
 process_urmp: true
 process_testset: false
 skip_copy: false

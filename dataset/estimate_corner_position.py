@@ -1,4 +1,3 @@
-import librosa
 import numpy as np
 from audio_utils import pad_to_expected_size
 from corner_position import refine_breakpoint, compute_relative_corner_position, calculate_dynamic_rms
@@ -13,38 +12,6 @@ def _split_positive_negative_indices(sr, audio):
         elif val < 0:
             negative_indices.append([i / sr, val])
     return positive_indices, negative_indices
-
-
-def _calculate_split_rms(positive_indices, negative_indices, hop_size):
-    if len(positive_indices) == 0 or len(negative_indices) == 0:
-        return None, None
-
-    y_pos_vals = [x[1] for x in positive_indices]
-    y_neg_vals = [x[1] for x in negative_indices]
-    rms_pos = librosa.feature.rms(
-        y=np.array(y_pos_vals),
-        frame_length=len(positive_indices),
-        hop_length=hop_size,
-        center=False,
-    )
-    rms_neg = librosa.feature.rms(
-        y=np.array(y_neg_vals),
-        frame_length=len(negative_indices),
-        hop_length=hop_size,
-        center=False,
-    )
-    return rms_pos[0, 0], -rms_neg[0, 0]
-
-
-def _get_rms_thresholds(audio, sr, hop_size, corner_position, positive_indices, negative_indices):
-    if getattr(corner_position, 'use_dynamic_rms', False) is True:
-        cutoff_hz = corner_position.rms_envelope_cutoff_hz
-        return calculate_dynamic_rms(audio, sr, cutoff_hz)
-
-    rms_pos, rms_neg = _calculate_split_rms(positive_indices, negative_indices, hop_size)
-    rms_pos_arr = np.full(len(audio), rms_pos, dtype=np.float32)
-    rms_neg_arr = np.full(len(audio), rms_neg, dtype=np.float32)
-    return rms_pos_arr, rms_neg_arr
 
 
 def _detect_breakpoints(audio, rms_pos_arr, rms_neg_arr, peak_height_factor):
@@ -90,12 +57,6 @@ def _detect_breakpoints(audio, rms_pos_arr, rms_neg_arr, peak_height_factor):
     return breakpoints
 
 
-def _build_no_regression_output(breakpoints, corner_positions, hop_size):
-    for idx, sign in breakpoints:
-        corner_positions[idx // hop_size] = sign
-    return corner_positions
-
-
 def _build_regression_output(audio, breakpoints, corner_positions, corner_duty_cycle, hop_size, window, num_frames):
     refined_times = []
     refined_signs = []
@@ -118,10 +79,9 @@ def _build_regression_output(audio, breakpoints, corner_positions, corner_duty_c
 def calc_corner_positions(
     audio, hop_size, feat_size, corner_position, sr, contiguous, debug
 ):
-    use_regression = getattr(corner_position, 'use_regression', False) is True
     num_frames = int(np.ceil(len(audio) / hop_size))
     corner_positions = np.zeros(num_frames, dtype=np.float32)
-    corner_duty_cycle = np.full(num_frames, -1.0, dtype=np.float32) if use_regression else None
+    corner_duty_cycle = np.full(num_frames, -1.0, dtype=np.float32)
 
     def pad(arr, pad_value):
         return pad_to_expected_size(
@@ -132,29 +92,18 @@ def calc_corner_positions(
     positive_indices, negative_indices = _split_positive_negative_indices(sr, audio)
 
     if len(positive_indices) == 0 or len(negative_indices) == 0:
-        corner_positions = pad(corner_positions, 0)
-        if use_regression:
-            corner_duty_cycle = pad(corner_duty_cycle, -1.0)
-        return corner_positions, corner_duty_cycle
-
-    rms_pos_arr, rms_neg_arr = _get_rms_thresholds(
-        audio, sr, hop_size, corner_position, positive_indices, negative_indices
-    )
+        return pad(corner_positions, 0), pad(corner_duty_cycle, -1.0)
+    
+    cutoff_hz = corner_position.rms_envelope_cutoff_hz
+    rms_pos_arr, rms_neg_arr = calculate_dynamic_rms(audio, sr, cutoff_hz)
 
     breakpoints = _detect_breakpoints(
         audio, rms_pos_arr, rms_neg_arr, corner_position.peak_height_factor
     )
 
-    if not use_regression:
-        corner_positions = _build_no_regression_output(breakpoints, corner_positions, hop_size)
-    else:
-        corner_positions, corner_duty_cycle = _build_regression_output(
-            audio, breakpoints, corner_positions, corner_duty_cycle,
-            hop_size, corner_position.regression_window_samples, num_frames,
-        )
+    corner_positions, corner_duty_cycle = _build_regression_output(
+        audio, breakpoints, corner_positions, corner_duty_cycle,
+        hop_size, corner_position.regression_window_samples, num_frames,
+    )
 
-    corner_positions = pad(corner_positions, 0)
-    if use_regression:
-        corner_duty_cycle = pad(corner_duty_cycle, -1.0)
-
-    return corner_positions, corner_duty_cycle
+    return pad(corner_positions, 0), pad(corner_duty_cycle, -1.0)
