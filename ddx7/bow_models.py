@@ -62,7 +62,7 @@ class TCNBowDecoder(nn.Module):
 
         if n_keys == 2:
             in_channels = 2
-        elif n_keys == 3:
+        elif n_keys >= 3:
             in_channels = 2 + z_size
         else:
             raise ValueError("Expected 2 or 3 input keys. got: {}".format(input_keys))
