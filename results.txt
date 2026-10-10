@@ -1,0 +1,43 @@
+python eval_fad.py runs/baseline/seed1 [RESULT] Model FAD (generated test set vs. background): 6.991869366238088 
+python eval_fad.py runs/baseline/seed2 [RESULT] Model FAD (generated test set vs. background): 6.4531087985789135
+python eval_fad.py runs/baseline/seed3 [RESULT] Model FAD (generated test set vs. background): 4.951856644328437
+python eval_fad.py runs/baseline/seed4 [RESULT] Model FAD (generated test set vs. background): 5.508746944891001
+python eval_fad.py runs/baseline/seed5 [RESULT] Model FAD (generated test set vs. background): 7.612990907130987
+python eval_fad.py runs/baseline/seed6 [RESULT] Model FAD (generated test set vs. background): 5.014758084696876
+python eval_fad.py runs/baseline/seed7 [RESULT] Model FAD (generated test set vs. background): 6.850646973762419
+python eval_fad.py runs/baseline/seed8 [RESULT] Model FAD (generated test set vs. background): 6.616026480818366
+python eval_fad.py runs/baseline/seed9 [RESULT] Model FAD (generated test set vs. background): 5.544715118538445
+python eval_fad.py runs/baseline/seed10 [RESULT] Model FAD (generated test set vs. background): 5.180060064018328
+
+python eval_fad.py runs/corner_duty_cycle/seed1 [RESULT] Model FAD (generated test set vs. background): 6.419440537206377
+python eval_fad.py runs/corner_duty_cycle/seed2 [RESULT] Model FAD (generated test set vs. background): 4.045018231237286
+python eval_fad.py runs/corner_duty_cycle/seed3 [RESULT] Model FAD (generated test set vs. background): 5.255184857828986
+python eval_fad.py runs/corner_duty_cycle/seed4 [RESULT] Model FAD (generated test set vs. background): 8.091687762511658
+python eval_fad.py runs/corner_duty_cycle/seed5 [RESULT] Model FAD (generated test set vs. background): 5.668246072464235
+python eval_fad.py runs/corner_duty_cycle/seed6 [RESULT] Model FAD (generated test set vs. background): 4.691265972900421
+python eval_fad.py runs/corner_duty_cycle/seed7 [RESULT] Model FAD (generated test set vs. background): 5.318351468453777
+python eval_fad.py runs/corner_duty_cycle/seed8 [RESULT] Model FAD (generated test set vs. background): 5.0101341927156895
+python eval_fad.py runs/corner_duty_cycle/seed9 [RESULT] Model FAD (generated test set vs. background): 4.705172884574118
+python eval_fad.py runs/corner_duty_cycle/seed10 [RESULT] Model FAD (generated test set vs. background): 6.948507711882545
+
+python eval_fad.py runs/bow_physics/seed1 [RESULT] Model FAD (generated test set vs. background): 8.958499751168379
+python eval_fad.py runs/bow_physics/seed2 [RESULT] Model FAD (generated test set vs. background): 4.671640522820255
+python eval_fad.py runs/bow_physics/seed3 [RESULT] Model FAD (generated test set vs. background): 5.727180799999058
+python eval_fad.py runs/bow_physics/seed4 [RESULT] Model FAD (generated test set vs. background): 4.798920160775612
+python eval_fad.py runs/bow_physics/seed5 [RESULT] Model FAD (generated test set vs. background): 6.355689219780714
+python eval_fad.py runs/bow_physics/seed6 [RESULT] Model FAD (generated test set vs. background): 5.634685037030518
+python eval_fad.py runs/bow_physics/seed7 [RESULT] Model FAD (generated test set vs. background): 7.430277603917517
+python eval_fad.py runs/bow_physics/seed8 [RESULT] Model FAD (generated test set vs. background): 5.406102047419765
+python eval_fad.py runs/bow_physics/seed9 [RESULT] Model FAD (generated test set vs. background): 8.9017111974924
+python eval_fad.py runs/bow_physics/seed10 [RESULT] Model FAD (generated test set vs. background): 5.333630263209361
+
+python eval_fad.py runs/bow_physics_corner_duty/seed1 [RESULT] Model FAD (generated test set vs. background): 5.059672558642749
+python eval_fad.py runs/bow_physics_corner_duty/seed2 [RESULT] Model FAD (generated test set vs. background): 7.483590808689804
+python eval_fad.py runs/bow_physics_corner_duty/seed3 [RESULT] Model FAD (generated test set vs. background): 8.396608193309426
+python eval_fad.py runs/bow_physics_corner_duty/seed4 [RESULT] Model FAD (generated test set vs. background): 4.72415025730033
+python eval_fad.py runs/bow_physics_corner_duty/seed5 [RESULT] Model FAD (generated test set vs. background): 4.980574690395091
+python eval_fad.py runs/bow_physics_corner_duty/seed6 [RESULT] Model FAD (generated test set vs. background): 7.905446836059976
+python eval_fad.py runs/bow_physics_corner_duty/seed7 [RESULT] Model FAD (generated test set vs. background): 5.83381110084194
+python eval_fad.py runs/bow_physics_corner_duty/seed8 [RESULT] Model FAD (generated test set vs. background): 6.978194120825798
+python eval_fad.py runs/bow_physics_corner_duty/seed9 [RESULT] Model FAD (generated test set vs. background): 5.251009790822444
+python eval_fad.py runs/bow_physics_corner_duty/seed10 [RESULT] Model FAD (generated test set vs. background): 5.705567741790265

@@ -5,3 +5,4 @@ dataset/data/
 dataset/outputs/
 *.egg-info/
 runs/
+.DS_Store

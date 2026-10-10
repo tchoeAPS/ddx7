@@ -28,7 +28,7 @@ data_processor:
   device: 'mps'                      # Torch Device ID
   crepe_params:
     model: 'full'                       # use 'full' for dataset generation - 'tiny' also available
-    confidence_threshold: 0.80          # used 0.80 for flute, and 0.85 for violin and trumpet
+    confidence_threshold: 0.85          # used 0.80 for flute, and 0.85 for violin and trumpet
     batch_size: 128
     fmin: 50
     fmax: 2000
@@ -39,9 +39,14 @@ data_processor:
   hop_size: 64                           # hop size in samples for CREPE, RMS, or loudness
   max_len: 4                             # Maximum block len ( in seconds )
   seq_len: 3                             # Minimum block len (in seconds) -> block is padded to fit max_len
-  debug: False                           # Verbose
+  debug: False                            # Verbose
   center: False                          # True: Center loudness and pitch window before computing. False: Pad at the end.
-
+  corner_position:
+    enabled: True
+    peak_height_factor: 1.5
+    regression_window_samples: 16   # Samples fit on each side of a corner for sub-sample refinement.
+    rms_envelope_cutoff_hz: 150.0    # Low-pass cutoff for the time-varying RMS envelope (paper section 2.2/3.1).
+    
 hydra:
   run:
     dir: outputs/null
