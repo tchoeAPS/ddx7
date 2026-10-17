@@ -6,3 +6,4 @@ dataset/outputs/
 *.egg-info/
 runs/
 .DS_Store
+dataset/corner_comparison/

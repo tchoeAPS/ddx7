@@ -50,9 +50,9 @@ def calculate_dynamic_rms(audio, sr, cutoff_hz):
 
 def compute_relative_corner_position(breakpoint_times, breakpoint_signs):
     cycles = []
-    for k in range(0, len(breakpoint_times) - 2, 2):
+    for k in range(len(breakpoint_times) - 2):
         s0, s1, s2 = breakpoint_signs[k], breakpoint_signs[k + 1], breakpoint_signs[k + 2]
-        if s0 == s1 or s1 == s2:
+        if not (s0 > 0 and s1 < 0 and s2 > 0):
             continue
         t0, t1, t2 = breakpoint_times[k], breakpoint_times[k + 1], breakpoint_times[k + 2]
         if not (t0 < t1 < t2):

@@ -41,3 +41,14 @@ python eval_fad.py runs/bow_physics_corner_duty/seed7 [RESULT] Model FAD (genera
 python eval_fad.py runs/bow_physics_corner_duty/seed8 [RESULT] Model FAD (generated test set vs. background): 6.978194120825798
 python eval_fad.py runs/bow_physics_corner_duty/seed9 [RESULT] Model FAD (generated test set vs. background): 5.251009790822444
 python eval_fad.py runs/bow_physics_corner_duty/seed10 [RESULT] Model FAD (generated test set vs. background): 5.705567741790265
+
+python eval_fad.py runs/corner_duty_cycle_v2/seed1 [RESULT] Model FAD (generated test set vs. background): 6.3252117971837585
+python eval_fad.py runs/corner_duty_cycle_v2/seed2 [RESULT] Model FAD (generated test set vs. background): 4.150651692408577
+python eval_fad.py runs/corner_duty_cycle_v2/seed3 [RESULT] Model FAD (generated test set vs. background): 4.4191639559699105
+python eval_fad.py runs/corner_duty_cycle_v2/seed4 
+python eval_fad.py runs/corner_duty_cycle_v2/seed5 
+python eval_fad.py runs/corner_duty_cycle_v2/seed6 
+python eval_fad.py runs/corner_duty_cycle_v2/seed7 
+python eval_fad.py runs/corner_duty_cycle_v2/seed8 
+python eval_fad.py runs/corner_duty_cycle_v2/seed9 
+python eval_fad.py runs/corner_duty_cycle_v2/seed10
