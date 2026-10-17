@@ -19,8 +19,12 @@ class BowPhysicsModule(nn.Module):
         friction_a=5.0,
         learnable_a=True,
         fr=[1, 1, 1, 1, 3, 14],
+        use_friction=True,
     ):
         super().__init__()
+        # use_friction=False zeroes the friction feature but keeps every layer,
+        # as a control for whether the friction curve itself matters.
+        self.use_friction = use_friction
         a_init = torch.tensor(float(friction_a))
         self.learnable_a = learnable_a
         if learnable_a:
@@ -49,10 +53,13 @@ class BowPhysicsModule(nn.Module):
             x["bow_velocity"],
             x["bow_bridge_distance"],
         )
-        a = self._a()
-        eta = bow_velocity  # approximation: no simulated string state available
-        phi = torch.sqrt(2 * a) * torch.exp(-a * eta**2 + 0.5) * eta
-        friction_signal = bow_force * phi
+        if self.use_friction:
+            a = self._a()
+            eta = bow_velocity  # approximation: no simulated string state available
+            phi = torch.sqrt(2 * a) * torch.exp(-a * eta**2 + 0.5) * eta
+            friction_signal = bow_force * phi
+        else:
+            friction_signal = torch.zeros_like(bow_force)
 
         features = torch.cat(
             [bow_force, bow_velocity, bow_bridge_distance, friction_signal], -1
